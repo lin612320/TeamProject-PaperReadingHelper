@@ -61,11 +61,14 @@ feat|fix|docs|test|chore: 简述 (#IssueID)
 
 **commit 必须带 Issue 编号**——Scrum Meeting 的签入记录要与 Issue 一一对应，否则评审不计工作量。
 
+完整推送纪律（分支、时机、四步自检、冲突处理、禁止提交项、后果）见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
+
 ## 文档索引
 
 | 文档 | 内容 |
 |---|---|
 | `docs/团队分工明细.md` | **七人分工、任务包、责任矩阵、越界红线、接口对接人** |
+| `CONTRIBUTING.md` | **贡献规范：分支、提交格式、推送纪律、禁止提交项（新人必读）** |
 | `docs/01-api-contract.yaml` | 接口契约（v0.1 草案，D3 冻结） |
 | `docs/Alpha功能清单.md` | Alpha 四个功能与逐条验收标准 |
 | `docs/三轮功能路线图.md` | Alpha / Beta / RC 任务池与七人分工 |
