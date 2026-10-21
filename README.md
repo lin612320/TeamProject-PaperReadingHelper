@@ -40,15 +40,15 @@ docker compose logs -f postgres
 
 > 应用服务（frontend / backend / ai-service）容器尚未接入，见 `docker-compose.yml` 内 TODO。待各自 Dockerfile 就绪后启用，目标是一条 `docker compose up` 起全栈（Issue #2）。
 
-## 分支规范（trunk-based）
+## 分支规范（双分支）
 
-| 类型 | 命名 | 说明 |
+| 分支 | 职责 | 谁能动 |
 |---|---|---|
-| 主干 | `main` | 始终可运行，禁止直接 push |
-| 功能 | `feature/<issue号>-<简述>` | 例：`feature/5-pdfjs-render` |
-| 修复 | `fix/<issue号>-<简述>` | 例：`fix/19-citation-page` |
+| `master` | 日常集成：功能提交、修改、修复全部进这里 | **全体成员**，直接推送或走 feature 分支合入 |
+| `release` | 交付/答辩版本：每组评审通过后才升级一次 | **仅组长林子航**，成员禁止推送 |
 
-- 所有改动走 PR，至少 1 人 review 后合并
+- 成员可选走 `feature/<issue号>-<简述>` 分支（如 `feature/5-pdfjs-render`）再合入 `master`
+- `release` 只在 Alpha / Beta / RC 三个验收节点由组长合并，合并后在 commit message 标注版本
 - 不设长期 `develop` 分支（7 人 2.5 周，避免分支漂移）
 
 ## 提交规范
