@@ -65,6 +65,7 @@ feat|fix|docs|test|chore: 简述 (#IssueID)
 
 | 文档 | 内容 |
 |---|---|
+| `docs/团队分工明细.md` | **七人分工、任务包、责任矩阵、越界红线、接口对接人** |
 | `docs/01-api-contract.yaml` | 接口契约（v0.1 草案，D3 冻结） |
 | `docs/Alpha功能清单.md` | Alpha 四个功能与逐条验收标准 |
 | `docs/三轮功能路线图.md` | Alpha / Beta / RC 任务池与七人分工 |
@@ -72,6 +73,8 @@ feat|fix|docs|test|chore: 简述 (#IssueID)
 | `docs/全员必学清单.md` | D1–D3 全员学习清单与验收方式 |
 
 ## 团队
+
+分工细则见 [`docs/团队分工明细.md`](docs/团队分工明细.md)：每人任务包、Issue 编号、责任矩阵、越界红线、接口对接人。
 
 | 编号 | 角色 | Alpha 主责 |
 |---|---|---|
