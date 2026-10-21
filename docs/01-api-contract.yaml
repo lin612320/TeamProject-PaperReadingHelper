@@ -1,0 +1,379 @@
+openapi: 3.0.3
+info:
+  title: PaperMind API
+  version: 0.1.0-draft
+  description: |
+    PaperMind 论文阅读助手接口契约（草案，D3 冻结）。
+
+    约定：
+    - 所有响应统一包装为 ApiResponse，成功 code=0
+    - 时间统一 ISO 8601（Asia/Shanghai）
+    - 错误必须返回结构化 code + message，禁止裸抛堆栈
+    - 分页参数统一 page（从 1 开始）/ size
+    - 检索接口（/api/search）为 Beta 阶段预留，Alpha 不实现
+
+servers:
+  - url: http://localhost:8080
+    description: 本地后端（Spring Boot）
+
+tags:
+  - name: paper
+    description: 文献上传与管理
+  - name: qa
+    description: 单篇精读问答
+  - name: search
+    description: 关键词检索外部学术库（Beta 预留）
+
+paths:
+  /api/papers:
+    post:
+      tags: [paper]
+      summary: 上传 PDF 文献
+      description: Alpha：单用户，不做鉴权（P4/#13）
+      operationId: uploadPaper
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 仅接受 application/pdf
+      responses:
+        "200":
+          description: 上传成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponsePaperDetail"
+        "400":
+          description: 非 PDF 或文件为空
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+    get:
+      tags: [paper]
+      summary: 文献列表
+      operationId: listPapers
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1, minimum: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          description: 列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponsePaperList"
+
+  /api/papers/{paperId}:
+    get:
+      tags: [paper]
+      summary: 文献详情
+      operationId: getPaper
+      parameters:
+        - $ref: "#/components/parameters/PaperId"
+      responses:
+        "200":
+          description: 详情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponsePaperDetail"
+        "404":
+          description: 文献不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+    delete:
+      tags: [paper]
+      summary: 删除文献
+      operationId: deletePaper
+      parameters:
+        - $ref: "#/components/parameters/PaperId"
+      responses:
+        "200":
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+  /api/papers/{paperId}/file:
+    get:
+      tags: [paper]
+      summary: 获取 PDF 原文件（供 PDF.js 渲染）
+      operationId: getPaperFile
+      parameters:
+        - $ref: "#/components/parameters/PaperId"
+      responses:
+        "200":
+          description: PDF 二进制流
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+
+  /api/qa/ask:
+    post:
+      tags: [qa]
+      summary: 针对单篇论文提问
+      description: Alpha 返回答案 + 引用片段 + 页码；bbox 字段预留，Beta 填充（P5/#19）
+      operationId: askQuestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AskRequest"
+      responses:
+        "200":
+          description: 问答结果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseAskResult"
+        "404":
+          description: 文献不存在或尚未完成解析
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+  /api/search:
+    get:
+      tags: [search]
+      summary: 关键词检索外部学术库（Beta 预留，Alpha 不实现）
+      description: |
+        Beta 实现 F5-a：arXiv + OpenAlex；RC 实现多源聚合去重与排序。
+        合规红线：只取开放获取全文链接，非 OA 仅返回 landingUrl。
+      operationId: searchPapers
+      deprecated: false
+      x-status: beta-reserved
+      parameters:
+        - name: keyword
+          in: query
+          required: true
+          schema: { type: string, minLength: 1 }
+        - name: source
+          in: query
+          schema:
+            type: string
+            enum: [arxiv, openalex, semanticscholar, crossref]
+            default: arxiv
+        - name: page
+          in: query
+          schema: { type: integer, default: 1, minimum: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 10, minimum: 1, maximum: 50 }
+      responses:
+        "200":
+          description: 检索结果（Beta 才返回数据）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponsePaperMetaList"
+
+components:
+  parameters:
+    PaperId:
+      name: paperId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+
+  schemas:
+    ApiResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: integer
+          description: 0 表示成功，非 0 为业务错误码
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          nullable: true
+
+    ApiResponsePaperDetail:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/PaperDetail"
+
+    ApiResponsePaperList:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                total: { type: integer, example: 12 }
+                items:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/Paper"
+
+    ApiResponseAskResult:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/AskResult"
+
+    ApiResponsePaperMetaList:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                total: { type: integer }
+                items:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/PaperMeta"
+
+    Paper:
+      type: object
+      required: [id, title, pageCount, createdAt]
+      properties:
+        id: { type: integer, format: int64, example: 1 }
+        title:
+          type: string
+          example: Attention Is All You Need
+        filename:
+          type: string
+          example: attention.pdf
+        pageCount:
+          type: integer
+          example: 15
+        source:
+          type: string
+          description: 来源，本地上传为 upload；检索导入为 arxiv/openalex（Beta 启用）
+          enum: [upload, arxiv, openalex, semanticscholar, crossref]
+          default: upload
+        doi: { type: string, nullable: true }
+        arxivId: { type: string, nullable: true }
+        externalUrl:
+          type: string
+          nullable: true
+          description: 原文落地页（非 OA 时唯一可给的东西）
+        createdAt:
+          type: string
+          format: date-time
+
+    PaperDetail:
+      allOf:
+        - $ref: "#/components/schemas/Paper"
+        - type: object
+          properties:
+            parseStatus:
+              type: string
+              enum: [pending, parsing, ready, failed]
+              description: 解析状态，pending/parsing 时不允许提问
+            chunkCount: { type: integer, example: 128 }
+
+    Citation:
+      type: object
+      required: [page, snippet]
+      properties:
+        page:
+          type: integer
+          description: 引用所在页（1 起）
+          example: 3
+        snippet:
+          type: string
+          description: 引用原文片段
+        chunkId:
+          type: integer
+          format: int64
+          nullable: true
+        bboxX0:
+          type: number
+          nullable: true
+          description: 归一化左上 x（相对页宽 0~1），Alpha 为 null，Beta 填充
+        bboxY0:
+          type: number
+          nullable: true
+        bboxX1:
+          type: number
+          nullable: true
+        bboxY1:
+          type: number
+          nullable: true
+
+    AskRequest:
+      type: object
+      required: [paperId, question]
+      properties:
+        paperId: { type: integer, format: int64, example: 1 }
+        question:
+          type: string
+          minLength: 1
+          maxLength: 500
+          example: 这篇文章提出的方法核心是什么？
+
+    AskResult:
+      type: object
+      required: [answer, citations]
+      properties:
+        answer:
+          type: string
+          description: 基于检索段落生成的答案，不得脱离原文编造
+        citations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Citation"
+        elapsedMs:
+          type: integer
+          description: 服务端耗时，用于守护 < 20s 的验收标准
+        model:
+          type: string
+          example: deepseek-chat
+
+    PaperMeta:
+      type: object
+      description: 外部检索结果元数据（Beta）
+      required: [title, source]
+      properties:
+        title: { type: string }
+        authors:
+          type: array
+          items: { type: string }
+        year: { type: integer, nullable: true }
+        source:
+          type: string
+          enum: [arxiv, openalex, semanticscholar, crossref]
+        doi: { type: string, nullable: true }
+        arxivId: { type: string, nullable: true }
+        abstract: { type: string, nullable: true }
+        pdfUrl:
+          type: string
+          nullable: true
+          description: 仅开放获取（OA）全文链接；无权限时必须是 null
+        landingUrl:
+          type: string
+          nullable: true

@@ -1,0 +1,88 @@
+# PaperMind · 论文阅读助手
+
+> 中国海洋大学 · 软件工程 · 七仙过海团队
+> 让科研新手「读得懂、问得清、记得住、看得见成长」的智能论文精读平台
+
+## 一句话架构
+
+```
+Vue 3 + PDF.js + Element Plus   →   Spring Boot（业务底座）  →   FastAPI（AI/PDF 服务）
+                                        ↓                              ↓
+                              PostgreSQL + pgvector            本地文件存储
+                                        ↓
+                                     Redis（缓存）
+```
+
+## 目录结构
+
+```
+PaperMind/
+├─ docs/                 设计与迭代文档（契约、分工、Issue、功能清单）
+├─ frontend/             Vue 3 + PDF.js + Element Plus
+├─ backend/              Spring Boot 业务服务
+├─ ai-service/           FastAPI：PDF 解析 / 切片 / 检索 / 问答
+├─ docker-compose.yml    本地依赖编排（pgvector + Redis，应用服务待接入）
+└─ README.md
+```
+
+## 本地启动
+
+```bash
+# 1. 起依赖（当前可用）
+docker compose up -d
+
+# 2. 校验
+docker compose ps
+docker compose logs -f postgres
+```
+
+> 应用服务（frontend / backend / ai-service）容器尚未接入，见 `docker-compose.yml` 内 TODO。待各自 Dockerfile 就绪后启用，目标是一条 `docker compose up` 起全栈（Issue #2）。
+
+## 分支规范（trunk-based）
+
+| 类型 | 命名 | 说明 |
+|---|---|---|
+| 主干 | `main` | 始终可运行，禁止直接 push |
+| 功能 | `feature/<issue号>-<简述>` | 例：`feature/5-pdfjs-render` |
+| 修复 | `fix/<issue号>-<简述>` | 例：`fix/19-citation-page` |
+
+- 所有改动走 PR，至少 1 人 review 后合并
+- 不设长期 `develop` 分支（7 人 2.5 周，避免分支漂移）
+
+## 提交规范
+
+```
+feat|fix|docs|test|chore: 简述 (#IssueID)
+```
+
+例：`feat: PDF.js 单栏渲染接入 (#5)`
+
+**commit 必须带 Issue 编号**——Scrum Meeting 的签入记录要与 Issue 一一对应，否则评审不计工作量。
+
+## 文档索引
+
+| 文档 | 内容 |
+|---|---|
+| `docs/01-api-contract.yaml` | 接口契约（v0.1 草案，D3 冻结） |
+| `docs/Alpha功能清单.md` | Alpha 四个功能与逐条验收标准 |
+| `docs/三轮功能路线图.md` | Alpha / Beta / RC 任务池与七人分工 |
+| `docs/Alpha_Issue清单.md` | 28 条 Issue，按 D1–D15 排期 |
+| `docs/全员必学清单.md` | D1–D3 全员学习清单与验收方式 |
+
+## 团队
+
+| 编号 | 角色 | Alpha 主责 |
+|---|---|---|
+| P1 林子航 | 组长·架构·集成 | 契约、Compose 骨架、评审、端到端走查 |
+| P2 | 前端·PDF 核心 | PDF.js 渲染、翻页缩放、页码跳转 |
+| P3 | 前端·页面 | 上传页、文献列表、问答侧栏 |
+| P4 | 后端·业务 | 上传 / 文献 CRUD / 转发问答 |
+| P5 | AI·RAG | 抽取、切片、检索、答案 + 页码 |
+| P6 | 数据·部署 | 建表、Redis、一键启动、日志 |
+| P7 | 测试·文档 | 冒烟用例、Bug List、Scrum 博客 |
+
+详细验收标准见 `docs/三轮功能路线图.md`。
+
+## Alpha 出口条件
+
+> 上传 PDF 后可在浏览器内阅读，并针对该论文提问获得带引用页码的答案，点击页码可跳转对应页；全流程无 P0 崩溃，一键启动可用。

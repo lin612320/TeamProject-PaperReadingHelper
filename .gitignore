@@ -1,0 +1,51 @@
+# ---------- 通用 ----------
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.*
+!.env.example
+
+# ---------- Node / Vue ----------
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---------- Java / Spring Boot ----------
+target/
+build/
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+.gradle/
+*.iml
+.idea/
+out/
+
+# ---------- Python / FastAPI ----------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# ---------- 数据与产物 ----------
+data/
+uploads/
+*.db
+*.sqlite
+pgdata/
+redis-data/
+
+# ---------- 编辑器 ----------
+.vscode/
+!.vscode/extensions.json
+*.swp

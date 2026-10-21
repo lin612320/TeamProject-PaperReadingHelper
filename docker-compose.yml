@@ -1,0 +1,89 @@
+# PaperMind 本地依赖编排
+#
+# 当前可用：postgres(pgvector) + redis
+# 应用服务（frontend / backend / ai-service）待各自 Dockerfile 就绪后启用，
+# 目标：一条 `docker compose up` 起全栈（Issue #2，负责人 P1）
+#
+# 用法：
+#   docker compose up -d
+#   docker compose ps
+#   docker compose logs -f postgres
+#   docker compose down          # 保留数据卷
+#   docker compose down -v       # 连数据一起删
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: papermind-postgres
+    environment:
+      POSTGRES_DB: papermind
+      POSTGRES_USER: papermind
+      POSTGRES_PASSWORD: papermind_dev
+      TZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U papermind -d papermind"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: papermind-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ------------------------------------------------------------------
+  # TODO(P1/#2)：以下三个服务待 Dockerfile 就绪后取消注释
+  # ------------------------------------------------------------------
+  # backend:
+  #   build: ./backend
+  #   container_name: papermind-backend
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   environment:
+  #     SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/papermind
+  #     SPRING_DATASOURCE_USERNAME: papermind
+  #     SPRING_DATASOURCE_PASSWORD: papermind_dev
+  #     AI_SERVICE_URL: http://ai-service:8000
+  #   ports:
+  #     - "8080:8080"
+  #
+  # ai-service:
+  #   build: ./ai-service
+  #   container_name: papermind-ai
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   environment:
+  #     DATABASE_URL: postgresql://papermind:papermind_dev@postgres:5432/papermind
+  #   ports:
+  #     - "8000:8000"
+  #
+  # frontend:
+  #   build: ./frontend
+  #   container_name: papermind-frontend
+  #   depends_on:
+  #     - backend
+  #   ports:
+  #     - "8081:80"
+
+volumes:
+  pgdata:
+  redis-data:
