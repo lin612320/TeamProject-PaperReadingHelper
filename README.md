@@ -3,6 +3,8 @@
 > 中国海洋大学 · 软件工程 · 七仙过海团队
 > 让科研新手「读得懂、问得清、记得住、看得见成长」的智能论文精读平台
 
+**仓库**：https://github.com/lin612320/TeamProject-PaperReadingHelper （产品名沿用 PaperMind）
+
 ## 一句话架构
 
 ```
@@ -82,6 +84,17 @@ feat|fix|docs|test|chore: 简述 (#IssueID)
 | P7 | 测试·文档 | 冒烟用例、Bug List、Scrum 博客 |
 
 详细验收标准见 `docs/三轮功能路线图.md`。
+
+## 国内网络提示
+
+若 `git push` 报 `Connection was reset`（直连被重置）或 `schannel: AcquireCredentialsHandle failed`（证书库问题），按顺序执行：
+
+```powershell
+git config --local http.proxy http://127.0.0.1:<你的代理端口>   # mihomo / Clash 的混合端口
+git config --local http.sslBackend openssl
+```
+
+当前维护者本机实测可用端口为 `10090`（mihomo）。组员按自己客户端的端口填写。
 
 ## Alpha 出口条件
 
