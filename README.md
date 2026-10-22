@@ -93,14 +93,32 @@ feat|fix|docs|test|chore: 简述 (#IssueID)
 
 ## 国内网络提示
 
-若 `git push` 报 `Connection was reset`（直连被重置）或 `schannel: AcquireCredentialsHandle failed`（证书库问题），按顺序执行：
+若 `git push` 报 `Connection was reset`（直连被重置）或 `schannel: AcquireCredentialsHandle failed`（证书库问题），按顺序试下面两种方案。
+
+**方案 A：HTTPS + 代理 + openssl 后端**
 
 ```powershell
 git config --local http.proxy http://127.0.0.1:<你的代理端口>   # mihomo / Clash 的混合端口
 git config --local http.sslBackend openssl
 ```
 
-当前维护者本机实测可用端口为 `10090`（mihomo）。组员按自己客户端的端口填写。
+维护者本机实测端口 `10090`（mihomo）。⚠️ 代理客户端一关就立刻推不动。
+
+**方案 B：SSH over 443（推荐，不依赖代理）**
+
+```powershell
+# 1. 生成密钥，把公钥加到 GitHub（Settings → SSH and GPG keys）
+ssh-keygen -t ed25519 -C "你的GitHub邮箱"
+
+# 2. 改 remote 与 SSH 端口
+git remote set-url origin ssh://git@ssh.github.com:443/lin612320/TeamProject-PaperReadingHelper.git
+git config core.sshCommand "ssh -p 443 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=NUL"
+
+# 3. 验证：看到 "Hi 你的用户名!" 即通
+ssh -p 443 -T git@ssh.github.com
+```
+
+维护者本机已切至此方案（`git@ssh.github.com:443`），代理关掉也能推。
 
 ## Alpha 出口条件
 
