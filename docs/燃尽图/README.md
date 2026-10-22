@@ -102,3 +102,19 @@
 | `燃尽图模板.csv` | 16 行（D0–D15），理想列已填好，实际列每天填 |
 | `燃尽图-第6周.png` | 待生成 |
 | `燃尽图-第7周.png` | 待生成 |
+
+---
+
+## 九、自动统计（推荐）
+
+不要手数，用脚本：
+
+```powershell
+cd PaperMind
+.\scripts\burndown.ps1 -Remaining 24        # 每天例会后，填今天剩余几条
+.\scripts\burndown.ps1                      # gh 已登录时全自动
+```
+
+脚本会自动补 D0 基线、定位当天行、算当日完成/新增/累计、回写 CSV，并在控制台打印迷你燃尽图与「落后理想线几条」。
+
+用法与参数见 [`../../scripts/README.md`](../../scripts/README.md)。
