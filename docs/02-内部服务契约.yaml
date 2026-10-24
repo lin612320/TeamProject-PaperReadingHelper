@@ -2,7 +2,7 @@
 # PaperMind · 内部服务契约（Spring Boot ↔ FastAPI）
 # ============================================================================
 # 谁和谁的约定：P4 刘万礼（Spring Boot，调用方） ↔ P5 吴啸天（FastAPI，被调用方）
-# 版本：0.9.0-rc-for-review   评审通过后改 1.0.0-frozen
+# 版本：1.0.0-frozen   冻结日期：2026-10-24（P1 裁定提前冻结）
 #
 # 【它管什么】
 #   浏览器看不到这条链路。它只管「后端怎么让 AI 服务干活、AI 服务怎么把结果交回来」。
@@ -23,7 +23,7 @@ openapi: 3.0.3
 
 info:
   title: PaperMind Internal API (Spring Boot ↔ FastAPI)
-  version: 0.9.0-rc-for-review
+  version: 1.0.0-frozen
   description: |
     内部服务契约。P5 在 FastAPI 里实现下面 4 个接口，P4 在 Spring Boot 里调用。
 

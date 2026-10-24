@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
   title: PaperMind API
-  version: 0.9.0-rc-for-review
+  version: 1.0.0-frozen
   description: |
-    PaperMind 论文阅读助手接口契约（**待评审版**，D3 评审通过后升为 1.0.0-frozen）。
+    PaperMind 论文阅读助手接口契约（**已冻结 1.0.0**，2026-10-24 由 P1 裁定冻结；变更须经 P1 并升版本号）。
 
     约定：
     - 所有响应统一包装为 ApiResponse，成功 code=0
@@ -386,8 +386,14 @@ components:
 # ============================================================
 x-conventions:
   freeze:
-    review_gate: D3 评审通过后改 version 为 1.0.0-frozen
+    frozen_at: 2026-10-24
+    review_gate: 2026-10-24 由 P1 林子航裁定提前冻结（未经集体评审，D1 站会向全员通报）
     change_policy: 冻结后任何字段增删改必须经 P1，并全员通知，同步更新本文件版本号
+    version_rule:
+      patch_1_0_x: 新增可选字段、补充注释、修正文案 —— 直接改，版本 +0.0.1，群里说一声
+      minor_1_1_0: 新增接口、新增必填字段 —— 必须改，版本 +0.1.0，P1 通知全员并同步改前后端
+      major_2_0_0: 删除/重命名字段、改语义（如页码起点） —— 禁止在 Alpha 内发生，只能进 Beta
+    who_approves: P1 林子航（各组员不得私自改本文件）
 
   pagination:
     page_starts_at: 1

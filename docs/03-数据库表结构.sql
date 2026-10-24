@@ -2,13 +2,13 @@
 -- PaperMind · 数据库表结构契约（PostgreSQL 16 + pgvector）
 -- ============================================================================
 -- 谁和谁的约定：P6 刘征（建表） ↔ P4 刘万礼（读写 papers） ↔ P5 吴啸天（读写 chunks）
--- 版本：0.9.0-rc-for-review   评审通过后改 1.0.0-frozen
+-- 版本：1.0.0-frozen   冻结日期：2026-10-24（P1 裁定提前冻结）
 --
 -- 【它管什么】
 --   三个人的代码都往这几张表读写，字段名错一个字母就查不出来。
 --   本文件就是唯一标准：名字、类型、能不能空、默认值、约束、索引，全在这里。
 --
--- 【五条全局约定，先记死】
+-- 【五条全局约定】
 --   1. 命名一律 snake_case（parse_status，不是 parseStatus）
 --   2. 主键统一 BIGSERIAL；外键统一 BIGINT
 --   3. 时间统一 TIMESTAMPTZ，默认 now()，不要用不带时区的 TIMESTAMP
@@ -86,7 +86,7 @@ CREATE INDEX IF NOT EXISTS idx_papers_parse_status
 CREATE TABLE IF NOT EXISTS chunks (
     id                BIGSERIAL    PRIMARY KEY,
 
-    -- 论文删除时级联删掉它的段落，避免孤儿数据（评审要点第 9 条）
+    -- 论文删除时级联删掉它的段落，避免孤儿数据
     paper_id          BIGINT       NOT NULL
                       REFERENCES papers(id) ON DELETE CASCADE,
 
@@ -122,7 +122,7 @@ COMMENT ON COLUMN chunks.embedding  IS '向量，维度必须等于 1024（与 b
 CREATE INDEX IF NOT EXISTS idx_chunks_paper
     ON chunks (paper_id);
 
--- 向量索引：**现在先不建**，原因如下
+-- 向量索引：先不建，原因如下
 --   1. Alpha 数据量小（几篇论文、几百片段），顺序扫描比建索引更快
 --   2. ivfflat / hnsw 需要先有数据再建才能保证效果
 --   3. 建错索引反而拖慢，Beta 阶段数据量上来后再按下面这条建：
@@ -213,7 +213,7 @@ CREATE TRIGGER trg_annotation_updated_at
 
 
 -- ============================================================================
--- P6 建表后的验收自查（四条，执行完把结果截图发群）
+-- P6 建表后的验收自查
 -- ============================================================================
 -- 1) 四张表都在
 --    \dt
@@ -230,6 +230,6 @@ CREATE TRIGGER trg_annotation_updated_at
 --    DELETE FROM papers WHERE id = currval('papers_id_seq');
 --    SELECT count(*) FROM chunks;   -- 应为 0
 --
--- 4) 状态约束生效（下面这条必须报错，报错才是对的）
+-- 4) 状态约束生效
 --    UPDATE papers SET parse_status = 'done' WHERE id = 1;
 --    -- 预期：violates check constraint "papers_parse_status_check"
