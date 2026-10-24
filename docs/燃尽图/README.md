@@ -118,3 +118,38 @@ cd PaperMind
 脚本会自动补 D0 基线、定位当天行、算当日完成/新增/累计、回写 CSV，并在控制台打印迷你燃尽图与「落后理想线几条」。
 
 用法与参数见 [`../../scripts/README.md`](../../scripts/README.md)。
+
+---
+
+## 十、曲线在哪里看（三处，任选）
+
+| 位置 | 看到什么 | 适合 |
+|---|---|---|
+| **docs/燃尽图/燃尽图-当前.md** | 生成的 PNG 曲线，GitHub 网页直接渲染 | 每天扫一眼、给老师看 |
+| 终端 | 跑脚本后打印的迷你条形图 | 站会当场报数 |
+| Excel / WPS | 打开 CSV 自己画 | 出正式图（博客用） |
+
+### 每日操作（2 分钟，P7 执行）
+
+``powershell
+cd PaperMind
+.\scripts\burndown.ps1 -Remaining 24        # 1. 记数
+.\scripts\burndown-chart.ps1                # 2. 重画图
+git add docs/燃尽图; git commit -m "chore: 更新燃尽图 (#3)"; git push
+``
+
+### 你的管理动作（P1）
+
+只有一个数：**实际剩余 − 理想剩余**
+
+| 偏差 | 动作 |
+|---|---|
+| ≤ 2 | 不动 |
+| 3–4 | 站会问谁卡住，当场解阻塞 |
+| ≥ 5 | 砍范围（动 Beta 的活）或加人，博客写清原因 |
+
+### 三条铁律
+
+1. Issue 关闭，曲线才下降 —— 做完不关＝数据失真
+2. 总数只增不减，且要在博客说明
+3. 忘了跑就补：`.\scripts\burndown.ps1 -Day D5 -Remaining 19`

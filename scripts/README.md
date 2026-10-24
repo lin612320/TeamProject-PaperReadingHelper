@@ -79,3 +79,26 @@ cd PaperMind
 ```
 
 详见 [`../docs/燃尽图/README.md`](../docs/燃尽图/README.md)。
+
+---
+
+## burndown-chart.ps1 · 生成燃尽可能图表
+
+把 CSV 画成 PNG（灰色虚线=理想，蓝色实线=实际），生成后可在 GitHub 网页直接看。
+
+``powershell
+# 默认输出 docs/燃尽图/燃尽图-当前.png
+.\scripts\burndown-chart.ps1
+
+# 出里程碑图（博客用）
+.\scripts\burndown-chart.ps1 -Out ..\docs\燃尽图\燃尽图-第6周.png -Title 'Alpha 冲刺燃尽图（第 6 周）'
+``
+
+| 参数 | 说明 | 默认 |
+|---|---|---|
+| -Csv | 数据源 | docs/燃尽图/燃尽图模板.csv |
+| -Out | 输出 PNG | docs/燃尽图/燃尽图-当前.png |
+| -Title | 图标题 | Alpha 冲刺燃尽图 |
+
+依赖 Windows 自带的 System.Drawing，无需安装任何东西。
+查看入口：[../docs/燃尽图/燃尽图-当前.md](../docs/燃尽图/燃尽图-当前.md)
