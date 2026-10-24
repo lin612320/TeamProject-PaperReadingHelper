@@ -1,16 +1,19 @@
 openapi: 3.0.3
 info:
   title: PaperMind API
-  version: 0.1.0-draft
+  version: 0.9.0-rc-for-review
   description: |
-    PaperMind 论文阅读助手接口契约（草案，D3 冻结）。
+    PaperMind 论文阅读助手接口契约（**待评审版**，D3 评审通过后升为 1.0.0-frozen）。
 
     约定：
     - 所有响应统一包装为 ApiResponse，成功 code=0
     - 时间统一 ISO 8601（Asia/Shanghai）
     - 错误必须返回结构化 code + message，禁止裸抛堆栈
-    - 分页参数统一 page（从 1 开始）/ size
+    - 分页参数统一 page（从 1 开始）/ size（默认 20，最大 100）
+    - **页码 page 一律从 1 开始（1-based）**，0 或负数视为非法
+    - **引用坐标 bbox 归一化为 0~1 的相对值**（相对当页宽高，左上为原点）；Alpha 阶段一律返回 null
     - 检索接口（/api/search）为 Beta 阶段预留，Alpha 不实现
+    - 详见文末 `x-conventions` 一节的错误码表与上传限制
 
 servers:
   - url: http://localhost:8080
@@ -377,3 +380,57 @@ components:
         landingUrl:
           type: string
           nullable: true
+
+# ============================================================
+# 非 OpenAPI 标准字段，供团队对齐全队约定（评审重点）
+# ============================================================
+x-conventions:
+  freeze:
+    review_gate: D3 评审通过后改 version 为 1.0.0-frozen
+    change_policy: 冻结后任何字段增删改必须经 P1，并全员通知，同步更新本文件版本号
+
+  pagination:
+    page_starts_at: 1
+    default_size: 20
+    max_size: 100
+
+  coordinate:
+    page_starts_at: 1
+    bbox_normalized: true
+    bbox_range: "0.0 ~ 1.0"
+    bbox_origin: 左上角为原点，x 向右、y 向下
+    bbox_relative_to: 单页宽度 / 单页高度
+    alpha_behavior: 四个 bbox 字段一律返回 null，Beta 阶段填充
+
+  upload:
+    accepted_types: [application/pdf]
+    max_file_size_mb: 50
+    max_pages_warn: 200
+    storage: 本地磁盘，路径由后端配置，不得对外暴露
+
+  timeout:
+    qa_ask_seconds: 30
+    upstream_ai_seconds: 25
+
+  error_codes:
+    description: 统一返回 {code, message, data}；code=0 表示成功
+    table:
+      - { code: 0,     http: 200, name: OK,                message: "成功" }
+      - { code: 1001,  http: 400, name: INVALID_PARAM,     message: "参数缺失或格式错误" }
+      - { code: 1002,  http: 400, name: FILE_NOT_PDF,      message: "仅支持 PDF 文件" }
+      - { code: 1003,  http: 400, name: FILE_TOO_LARGE,    message: "文件超过 50MB" }
+      - { code: 1004,  http: 400, name: PAGE_OUT_OF_RANGE, message: "页码从 1 开始，超出文档页数" }
+      - { code: 2001,  http: 404, name: PAPER_NOT_FOUND,   message: "文献不存在" }
+      - { code: 2002,  http: 409, name: PAPER_NOT_READY,   message: "文献尚未解析完成，暂时无法提问" }
+      - { code: 2003,  http: 422, name: EMPTY_QUESTION,    message: "问题不能为空" }
+      - { code: 3001,  http: 502, name: AI_SERVICE_ERROR,  message: "AI 服务调用失败" }
+      - { code: 3002,  http: 504, name: AI_SERVICE_TIMEOUT,message: "AI 服务超时（>30s）" }
+      - { code: 4001,  http: 500, name: STORAGE_ERROR,     message: "文件存储失败" }
+      - { code: 5000,  http: 500, name: INTERNAL_ERROR,    message: "服务器内部错误" }
+
+  who_owns:
+    upload_and_crud: P4 刘万礼
+    qa_forward: P4 刘万礼
+    parse_and_retrieval: P5 吴啸天
+    pdf_render_and_jump: P2 杨靖
+    pages_and_sidebar: P3 杨绎平
