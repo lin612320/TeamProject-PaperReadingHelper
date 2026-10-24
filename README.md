@@ -69,7 +69,10 @@ feat|fix|docs|test|chore: 简述 (#IssueID)
 |---|---|
 | `docs/团队分工明细.md` | **七人分工、任务包、责任矩阵、越界红线、接口对接人** |
 | `CONTRIBUTING.md` | **贡献规范：分支、提交格式、推送纪律、禁止提交项（新人必读）** |
-| `docs/01-api-contract.yaml` | 接口契约（v0.1 草案，D3 冻结） |
+| `docs/01-api-contract.yaml` | **① 对外接口契约**（浏览器 ↔ Spring Boot，6 个接口） |
+| `docs/02-内部服务契约.yaml` | **② 内部服务契约**（Spring Boot ↔ FastAPI，4 个接口） |
+| `docs/03-数据库表结构.sql` | **③ 数据库表结构契约**（4 张表完整 DDL） |
+| `docs/契约评审要点.md` | D3 评审会：20 个拍板点 + 三份评审顺序 |
 | `docs/Alpha功能清单.md` | Alpha 四个功能与逐条验收标准 |
 | `docs/三轮功能路线图.md` | Alpha / Beta / RC 任务池与七人分工 |
 | `docs/Alpha_Issue清单.md` | 28 条 Issue，按 D1–D15 排期 |
