@@ -6,14 +6,14 @@
 #
 # 【它管什么】
 #   浏览器看不到这条链路。它只管「后端怎么让 AI 服务干活、AI 服务怎么把结果交回来」。
-#      浏览器 ──① 对外契约──> Spring Boot ──② 本文件──> FastAPI(AI)
+#      浏览器 ──对外契约──> Spring Boot ──本文件──> FastAPI(AI)
 #
-# 【和 ① 对外契约的三点不同，别混】
+# 【和对外契约的三点不同】
 #   1. 不套 {code, message, data} 那层壳 —— 内部直接返回业务对象
 #   2. 错误用 HTTP 状态码 + {code, message}，由 P4 翻译成对外错误码
 #   3. 不做鉴权（内网/本机调用），但必须校验 paperId 存在
 #
-# 【三个铁约定】
+# 【三个约定】
 #   1. 页码 page 一律从 1 开始（1-based）
 #   2. bbox 归一化 0~1，相对单页宽高，左上原点；Alpha 阶段一律返回 null
 #   3. P4 调用 P5 的超时上限 25 秒；超过就是 P5 的问题，P4 立即返回 3002
@@ -121,7 +121,7 @@ paths:
           3. 逐片生成向量，写入 chunks 表（embedding 维度必须与 vectorDim 一致）
           4. bbox_* 四个字段 Alpha 一律写 NULL
 
-        幂等性：同一 paperId 重复调用时，P5 应先删除该论文的旧 chunks 再重建，避免重复数据。
+        同一 paperId 重复调用时，P5 应先删除该论文的旧 chunks 再重建，避免重复数据。
       requestBody:
         required: true
         content:
@@ -337,7 +337,7 @@ components:
         detail:
           type: string
           nullable: true
-          description: 仅日志排查用，不要直接展示给终端用户（可能含堆栈）
+          description: 仅日志排查用，不要直接展示给终端用户
 
     # 问答返回体
     AskResult:
@@ -409,7 +409,7 @@ components:
           nullable: true
 
 # ============================================================================
-# 双方各自要做的验收（评审时逐条对）
+# 双方各自要做的验收
 # ============================================================================
 x-acceptance:
   P5_提供方:
