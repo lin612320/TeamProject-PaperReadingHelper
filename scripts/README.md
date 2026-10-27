@@ -102,3 +102,22 @@ cd PaperMind
 
 依赖 Windows 自带的 System.Drawing，无需安装任何东西。
 查看入口：[../docs/燃尽图/燃尽图-当前.md](../docs/燃尽图/燃尽图-当前.md)
+
+---
+
+## verify-db.ps1 · 环境与数据库验收
+
+一条命令验完 Issue #2 和 #21 的全部验收点，输出可直接贴进 Issue 当证据。
+
+````powershell
+cd PaperMind
+.\scripts\verify-db.ps1
+.\scripts\verify-db.ps1 -ReportPath ..\docs\例会\2026-10-28\环境验证.txt
+````
+
+做五件事：
+1. 检查 Docker 引擎是否在跑
+2. `docker compose up -d` 并等待 postgres / redis 变成 healthy
+3. 查四张表（papers / chunks / reading_session / annotation）是否都建出来
+4. 查 pgvector 扩展与 `chunks.embedding` 的维度
+5. 验级联删除、CHECK 约束是否真的生效
