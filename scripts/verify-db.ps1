@@ -94,22 +94,36 @@ Rec ("embedding 列类型：" + $dim.Trim())
 Line "5 / 5  验证级联删除与 CHECK 约束"
 
 $sql1 = "INSERT INTO papers (title, filename, file_path) VALUES ('__verify__','v.pdf','/tmp/v.pdf') RETURNING id;"
-$newId = (docker exec papermind-postgres psql -U papermind -d papermind -t -c $sql1 2>&1) | Out-String
-$newId = ($newId -replace '[^0-9]', '')
+$rawId = (docker exec papermind-postgres psql -U papermind -d papermind -t -c $sql1 2>&1) | Out-String
+$newId = (($rawId -split "`n") | Where-Object { $_ -match '^\s*\d+\s*$' } | Select-Object -Last 1)
+if ($newId) { $newId = $newId.Trim() }
 Rec ("插入测试论文 id=" + $newId)
 
 if ($newId) {
     docker exec papermind-postgres psql -U papermind -d papermind -c "INSERT INTO chunks (paper_id, chunk_index, page, content) VALUES ($newId, 0, 1, 'x')" 2>&1 | Out-Null
     docker exec papermind-postgres psql -U papermind -d papermind -c "DELETE FROM papers WHERE id=$newId" 2>&1 | Out-Null
-    $cnt = (docker exec papermind-postgres psql -U papermind -d papermind -t -c "SELECT count(*) FROM chunks WHERE paper_id=$newId" 2>&1) | Out-String
-    $cnt = ($cnt -replace '[^0-9]', '')
+    $rawCnt = (docker exec papermind-postgres psql -U papermind -d papermind -t -c "SELECT count(*) FROM chunks WHERE paper_id=$newId" 2>&1) | Out-String
+    $cnt = (($rawCnt -split "`n") | Where-Object { $_ -match '^\s*\d+\s*$' } | Select-Object -Last 1)
+    if ($cnt) { $cnt = $cnt.Trim() } else { $cnt = '-1' }
     if ($cnt -eq '0') { Ok "级联删除生效（删论文后 chunks 已归零）" ; Rec "级联删除：生效" }
     else { Bad ("级联删除未生效，残留 " + $cnt + " 条 chunks") ; Rec ("级联删除：未生效，残留 $cnt") }
 }
 
-$bad = (docker exec papermind-postgres psql -U papermind -d papermind -c "UPDATE papers SET parse_status='done' WHERE id=1" 2>&1) | Out-String
-if ($bad -match 'violates check constraint|错误|ERROR') { Ok "CHECK 约束生效（非法状态被拒绝）" ; Rec "CHECK 约束：生效" }
+# CHECK 测试要用自己新插入的行（上面的级联测试已经把临时行删了，不能复用 id=1）
+$chkSql = "INSERT INTO papers (title, filename, file_path) VALUES ('__chk__','c.pdf','/tmp/c.pdf') RETURNING id;"
+$rawChk = (docker exec papermind-postgres psql -U papermind -d papermind -t -c $chkSql 2>&1) | Out-String
+$chkId = (($rawChk -split "`n") | Where-Object { $_ -match '^\s*\d+\s*$' } | Select-Object -Last 1)
+if ($chkId) { $chkId = $chkId.Trim() }
+
+$badRaw = (docker exec papermind-postgres psql -U papermind -d papermind -v ON_ERROR_STOP=1 -c "UPDATE papers SET parse_status='done' WHERE id=$chkId" 2>&1) | Out-String
+if ($badRaw -match 'violates check constraint') { Ok "CHECK 约束生效（非法状态被拒绝）" ; Rec "CHECK 约束：生效" }
+elseif ($badRaw -match 'No such container') { Bad "容器不存在，无法验证 CHECK 约束" ; Rec "CHECK 约束：跳过（容器未起）" }
 else { Bad "CHECK 约束未生效（非法值 done 竟然写入成功）" ; Rec "CHECK 约束：未生效" }
+
+if ($chkId) {
+    docker exec papermind-postgres psql -U papermind -d papermind -c "DELETE FROM papers WHERE id=$chkId" 2>&1 | Out-Null
+    Rec "已清理 CHECK 测试用临时行"
+}
 
 # ---------------------------------------------------------------- 汇总
 Line "汇总"
