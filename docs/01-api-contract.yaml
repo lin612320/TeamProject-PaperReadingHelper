@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: PaperMind API
-  version: 1.0.0-frozen
+  version: 1.0.1-frozen
   description: |
     PaperMind 论文阅读助手接口契约（**已冻结 1.0.0**，2026-10-24 由 P1 裁定冻结；变更须经 P1 并升版本号）。
 
@@ -407,6 +407,11 @@ x-conventions:
     bbox_origin: 左上角为原点，x 向右、y 向下
     bbox_relative_to: 单页宽度 / 单页高度
     alpha_behavior: 四个 bbox 字段一律返回 null，Beta 阶段填充
+    # ↓ 1.0.1 新增：来自 P2 #7 预研结论，详见 docs/bbox坐标约定.md
+    page_meaning: 使用物理页码（封面、目录计入页数），不使用 PDF 内置页码标签 label
+    rotated_page: 旋转页建系不变（原点仍在左上），分母使用旋转后用户看到的当页宽高
+    bbox_constraint: 0 ≤ bboxX0 < bboxX1 ≤ 1 且 0 ≤ bboxY0 < bboxY1 ≤ 1，宽高必须为正，不允许相等
+    bbox_field_names: 接口字段为 bboxX0/bboxY0/bboxX1/bboxY1；数据库列为 bbox_x0/y0/x1/y1；doc 里的 x0/y0/x1/y1 只是简写，不得作为接口字段名
 
   upload:
     accepted_types: [application/pdf]
