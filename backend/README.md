@@ -27,3 +27,9 @@ Spring Boot · PostgreSQL(pgvector) · Redis
 - `papers`：含 `source / doi / arxiv_id / external_url`，为 Beta 检索导入预留
 - `chunks`：含 `bbox_x0/y0/x1/y1`，**可空**，Beta 填
 - `reading_session`、`annotation`：**空表先建**，RC 用
+
+## 本地开发环境
+
+- JDK 25（编译目标 17）+ Spring Boot 3.5.6
+- 依赖：`docker compose up -d` 起 postgres + redis
+- 2026-10-28 本地验证：`GET /api/papers` 返回 200 / `code:0`，`?page=0` 返回 400 / `code:1001`
