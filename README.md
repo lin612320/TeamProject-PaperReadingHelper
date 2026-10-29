@@ -39,6 +39,8 @@ docker compose logs -f postgres
 ```
 
 > 应用服务（frontend / backend / ai-service）容器尚未接入，见 `docker-compose.yml` 内 TODO。待各自 Dockerfile 就绪后启用，目标是一条 `docker compose up` 起全栈（Issue #2）。
+>
+> 改过 SQL 必须 `docker compose down -v` 才生效。
 
 ## 分支规范（双分支）
 
