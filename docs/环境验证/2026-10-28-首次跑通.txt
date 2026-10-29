@@ -1,0 +1,28 @@
+﻿验证时间：2026-10-28 10:33:08
+工作目录：C:\Users\86180\Desktop\软件工程\PaperMind
+Docker 引擎版本：29.9.2
+     Container papermind-redis Running 
+     Container papermind-postgres Running 
+
+NAME                 IMAGE                    COMMAND                  SERVICE    CREATED          STATUS                    PORTS
+papermind-postgres   pgvector/pgvector:pg16   "docker-entrypoint.s…"   postgres   30 seconds ago   Up 29 seconds (healthy)   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp
+papermind-redis      redis:7-alpine           "docker-entrypoint.s…"   redis      30 seconds ago   Up 29 seconds (healthy)   0.0.0.0:6379->6379/tcp, [::]:6379->6379/tcp
+
+结论：postgres 与 redis 均 healthy
+ public | annotation      | table | papermind
+ public | chunks          | table | papermind
+ public | papers          | table | papermind
+ public | reading_session | table | papermind
+
+
+表存在：papers
+表存在：chunks
+表存在：reading_session
+表存在：annotation
+pgvector 扩展已安装
+embedding 列类型：vector(1024)
+插入测试论文 id=3
+级联删除：生效
+CHECK 约束：生效
+已清理 CHECK 测试用临时行
+总体结论：全部通过

@@ -1,0 +1,426 @@
+# ============================================================================
+# PaperMind · 内部服务契约（Spring Boot ↔ FastAPI）
+# ============================================================================
+# 谁和谁的约定：P4 刘万礼（Spring Boot，调用方） ↔ P5 吴啸天（FastAPI，被调用方）
+# 版本：1.0.0-frozen   冻结日期：2026-10-24（P1 裁定提前冻结）
+#
+# 【它管什么】
+#   浏览器看不到这条链路。它只管「后端怎么让 AI 服务干活、AI 服务怎么把结果交回来」。
+#      浏览器 ──对外契约──> Spring Boot ──本文件──> FastAPI(AI)
+#
+# 【和对外契约的三点不同】
+#   1. 不套 {code, message, data} 那层壳 —— 内部直接返回业务对象
+#   2. 错误用 HTTP 状态码 + {code, message}，由 P4 翻译成对外错误码
+#   3. 不做鉴权（内网/本机调用），但必须校验 paperId 存在
+#
+# 【三个约定】
+#   1. 页码 page 一律从 1 开始（1-based）
+#   2. bbox 归一化 0~1，相对单页宽高，左上原点；Alpha 阶段一律返回 null
+#   3. P4 调用 P5 的超时上限 25 秒；超过就是 P5 的问题，P4 立即返回 3002
+# ============================================================================
+
+openapi: 3.0.3
+
+info:
+  title: PaperMind Internal API (Spring Boot ↔ FastAPI)
+  version: 1.0.0-frozen
+  description: |
+    内部服务契约。P5 在 FastAPI 里实现下面 4 个接口，P4 在 Spring Boot 里调用。
+
+    端口约定：AI 服务本地跑 8000，docker 内为 http://ai-service:8000
+
+servers:
+  # 本地开发时 P5 自己起的进程
+  - url: http://localhost:8000
+    description: 本地直跑（uvicorn app.main:app --port 8000）
+  # docker compose 里服务名互访
+  - url: http://ai-service:8000
+    description: docker compose 内部
+
+tags:
+  - name: health
+    description: 存活检查
+  - name: paper
+    description: 论文解析与向量化
+  - name: qa
+    description: 检索与问答
+  - name: cleanup
+    description: 清理
+
+paths:
+
+  # ==========================================================================
+  # 1. 健康检查 —— P4 启动时探活用，也用于一键启动脚本判断 AI 服务是否就绪
+  # ==========================================================================
+  /internal/health:
+    get:
+      tags: [health]
+      operationId: internalHealth
+      summary: 存活检查
+      description: |
+        P4 在启动时和每次问答前可调用（建议缓存 30 秒，不要每次请求都探）。
+        返回 dbReady=false 说明向量库没连上，此时不要接受解析/问答请求。
+      responses:
+        "200":
+          description: 服务正常
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok, degraded]
+                    description: ok=一切正常；degraded=服务活着但依赖有问题
+                  model:
+                    type: string
+                    example: deepseek-chat
+                    description: 当前使用的大模型名，便于排查「换模型后答案变差」
+                  embeddingModel:
+                    type: string
+                    example: bge-m3
+                    description: 向量模型名，必须与 chunks.embedding 维度一致
+                  vectorDim:
+                    type: integer
+                    example: 1024
+                    description: 向量维度，必须等于 chunks.embedding 的维度，否则检索必然报错
+                  dbReady:
+                    type: boolean
+                    example: true
+                  version:
+                    type: string
+                    example: 0.1.0
+        "503":
+          description: 依赖不可用（数据库/模型连不上）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalError"
+
+  # ==========================================================================
+  # 2. 解析论文 —— 全项目最慢的一步（几十秒），必须异步
+  # ==========================================================================
+  /internal/papers/parse:
+    post:
+      tags: [paper]
+      operationId: internalParsePaper
+      summary: 解析 PDF 并生成段落向量
+      description: |
+        **这是耗时接口（10~60 秒，取决于页数与模型速度），P4 必须异步调用。**
+
+        推荐流程（P4 侧）：
+          1. 用户上传 → P4 存文件进 papers 表，parse_status='pending' → 立即返回 200 给浏览器
+          2. P4 后台线程（@Async）调本接口
+          3. 调用前把 parse_status 改成 'parsing'
+          4. 本接口成功 → 改成 'ready'；失败 → 'failed' 并记录 parse_error
+          5. 浏览器侧轮询 GET /api/papers/{id}，看 parseStatus 决定是否允许提问
+
+        P5 侧要做的事：
+          1. 用 PyMuPDF 按 blocks 顺序抽文本（Alpha 不做双栏重排，Beta 再优化）
+          2. 按 500~800 字切片、重叠 100 字，每片记录所在页码（从 1 开始）
+          3. 逐片生成向量，写入 chunks 表（embedding 维度必须与 vectorDim 一致）
+          4. bbox_* 四个字段 Alpha 一律写 NULL
+
+        同一 paperId 重复调用时，P5 应先删除该论文的旧 chunks 再重建，避免重复数据。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [paperId, filePath]
+              properties:
+                paperId:
+                  type: integer
+                  format: int64
+                  example: 1
+                  description: papers 表主键
+                filePath:
+                  type: string
+                  example: /data/uploads/1/attention.pdf
+                  description: |
+                    PDF 在宿主机/容器内的绝对路径。由 P4 传入，P5 只读不删。
+                    注意：docker 里两边必须挂同一个卷，否则 P5 读不到文件。**
+                force:
+                  type: boolean
+                  default: false
+                  description: true=已有 chunks 也强制重建（换向量模型或切片策略后用）
+      responses:
+        "200":
+          description: 解析完成
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [paperId, parseStatus, pageCount, chunkCount, elapsedMs]
+                properties:
+                  paperId: { type: integer, format: int64 }
+                  parseStatus:
+                    type: string
+                    enum: [ready]
+                    description: 成功只会是 ready
+                  pageCount:
+                    type: integer
+                    example: 15
+                    description: PDF 总页数，P4 写回 papers.page_count
+                  chunkCount:
+                    type: integer
+                    example: 128
+                    description: 生成的段落数，P4 写回 papers.chunk_count
+                  vectorDim:
+                    type: integer
+                    example: 1024
+                  elapsedMs:
+                    type: integer
+                    example: 23000
+        "400":
+          description: 文件不是 PDF / 路径不存在（P4 应回写 parse_status='failed'）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalError"
+        "404":
+          description: papers 表中没有这个 paperId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalError"
+        "500":
+          description: 解析或向量化失败（P4 回写 parse_status='failed' + parse_error）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalError"
+
+  # ==========================================================================
+  # 3. 问答 —— 全项目最核心、最容易出问题的接口
+  # ==========================================================================
+  /internal/qa/ask:
+    post:
+      tags: [qa]
+      operationId: internalAsk
+      summary: 针对单篇论文检索并生成答案
+      description: |
+        **Alpha 阶段只允许针对单篇论文提问（不做跨文献）。**
+
+        P5 内部必须按这个顺序做（缺一步答案就会胡说）：
+          1. 把 question 用同一个 embedding 模型转成向量
+          2. 在该 paperId 的 chunks 里做向量相似度检索，取 topK（默认 3）
+          3. 把检索到的 3 段原文 + 问题拼成 Prompt
+          4. 调大模型生成答案，Prompt 必须要求「只依据给定片段作答」
+          5. 若检索结果与问题无关 → 返回固定话术「本文未涉及该内容」，citations 返回空数组
+          6. citations 从检索结果里取，最多 3 条，每条带 page
+
+        **硬约束**：
+        - 总耗时不超过 25 秒，超了 P4 会判超时并返回 3002
+        - 不允许编造；无依据时必须返回固定话术
+        - token 用量必须回传（P4 记账，答辩要算成本）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [paperId, question]
+              properties:
+                paperId:
+                  type: integer
+                  format: int64
+                  example: 1
+                question:
+                  type: string
+                  minLength: 1
+                  maxLength: 500
+                  example: 这篇文章提出的方法核心是什么？
+                topK:
+                  type: integer
+                  default: 3
+                  minimum: 1
+                  maximum: 8
+                  description: 检索候选段落数。调大召回更全但更慢、更贵，Alpha 固定 3
+                maxCitations:
+                  type: integer
+                  default: 3
+                  minimum: 0
+                  maximum: 5
+                  description: 返回给前端的引用条数上限
+      responses:
+        "200":
+          description: 生成成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AskResult"
+        "404":
+          description: 论文不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalError"
+        "409":
+          description: 论文尚未解析完成（没有 chunks 可检索）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalError"
+        "422":
+          description: 问题为空或超长
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalError"
+        "504":
+          description: 调用大模型超时
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalError"
+
+  # ==========================================================================
+  # 4. 删除论文的向量数据 —— P4 删 papers 时同步调用，避免孤儿数据
+  # ==========================================================================
+  /internal/papers/{paperId}:
+    delete:
+      tags: [cleanup]
+      operationId: internalDeletePaperData
+      summary: 删除某篇论文的段落与向量
+      description: |
+        P4 删除文献时先调本接口，再删 papers 记录。
+        （即使漏调，papers 删除时 chunks 有 ON DELETE CASCADE 兜底；本接口是显式清理 + 返回统计）
+      parameters:
+        - name: paperId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: 已删除
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  paperId: { type: integer, format: int64 }
+                  deletedChunks: { type: integer, example: 128 }
+        "500":
+          description: 删除失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalError"
+
+# ============================================================================
+components:
+  schemas:
+
+    # 内部错误统一结构：只有两个字段，P4 负责翻译成对外的 {code,message,data}
+    InternalError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: 内部错误标识，P4 用它做映射
+          enum:
+            - FILE_NOT_FOUND      # 文件路径不存在 → 对外 1001
+            - NOT_PDF             # 不是 PDF      → 对外 1002
+            - PAPER_NOT_FOUND     # 论文不存在    → 对外 2001
+            - PAPER_NOT_READY     # 还没解析完    → 对外 2002
+            - EMPTY_QUESTION      # 问题为空      → 对外 2003
+            - EMBEDDING_FAILED    # 向量化失败    → 对外 3001
+            - LLM_ERROR           # 大模型报错    → 对外 3001
+            - LLM_TIMEOUT         # 大模型超时    → 对外 3002
+            - INTERNAL_ERROR      # 其他          → 对外 5000
+        message:
+          type: string
+          example: 该论文尚未完成解析
+        detail:
+          type: string
+          nullable: true
+          description: 仅日志排查用，不要直接展示给终端用户
+
+    # 问答返回体
+    AskResult:
+      type: object
+      required: [answer, citations, elapsedMs, model]
+      properties:
+        answer:
+          type: string
+          description: |
+            生成的答案。必须基于检索到的原文片段；
+            无依据时固定返回「本文未涉及该内容」，并让 citations 为空数组。
+          example: 本文提出的核心方法是 Transformer 架构，完全基于注意力机制……
+        citations:
+          type: array
+          description: 引用列表，按相关度降序，最多 maxCitations 条
+          items:
+            $ref: "#/components/schemas/Citation"
+        elapsedMs:
+          type: integer
+          example: 4200
+          description: P5 侧总耗时，P4 用来记录慢请求
+        model:
+          type: string
+          example: deepseek-chat
+        tokenUsage:
+          type: object
+          description: |
+            token 用量，P4 据此算钱。本项目计费公式：
+            (prompt_tokens * 0.001 + completion_tokens * 0.002) / 1000
+          properties:
+            prompt: { type: integer, example: 1800 }
+            completion: { type: integer, example: 320 }
+            total: { type: integer, example: 2120 }
+            costCny:
+              type: number
+              example: 0.00244
+              description: 本次调用估算花费（元）
+
+    # 引用（注意与对外契约里的 Citation 保持一致，不要多一个字段少一个字段）
+    Citation:
+      type: object
+      required: [page, snippet]
+      properties:
+        page:
+          type: integer
+          example: 3
+          description: 引用所在页，**从 1 开始**
+        snippet:
+          type: string
+          description: 引用原文片段（截取 100~200 字，用于前端展示）
+        chunkId:
+          type: integer
+          format: int64
+          nullable: true
+          description: chunks 表主键，便于追溯
+        # ↓ 以下四个 Alpha 阶段必须返回 null，Beta 阶段由 P5 填入真实值
+        bboxX0:
+          type: number
+          nullable: true
+          description: 归一化左上角 x（0~1，相对页宽）
+        bboxY0:
+          type: number
+          nullable: true
+        bboxX1:
+          type: number
+          nullable: true
+        bboxY1:
+          type: number
+          nullable: true
+
+# ============================================================================
+# 双方各自要做的验收
+# ============================================================================
+x-acceptance:
+  P5_提供方:
+    - GET  /internal/health 返回 dbReady 与 vectorDim
+    - POST /internal/papers/parse 能对一篇 15 页 PDF 生成 chunks，耗时 < 60s
+    - POST /internal/qa/ask 能对「方法核心是什么」返回答案 + 页码引用
+    - 论文里没有的内容，返回「本文未涉及该内容」而不是编造
+    - 所有 citation 的 page 从 1 开始，bbox 全为 null
+    - tokenUsage 三个数字都有值
+  P4_调用方:
+    - 上传后立即返回，解析走后台线程，parse_status 按 pending→parsing→ready 流转
+    - 调 P5 设 25 秒超时，超时返回对外错误码 3002
+    - 把 P5 的 InternalError.code 正确映射成对外 code（见 InternalError 枚举注释）
+    - 删除文献时先调 DELETE 再删 papers
