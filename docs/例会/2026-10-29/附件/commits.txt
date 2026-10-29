@@ -1,0 +1,42 @@
+# 签入记录（截至 2026-10-29 20:00）
+
+## 今日提交（10-29）
+
+### 已合入 master
+
+```
+6d5b853 | Linyuue | 19:28 | feat: 接入 JDBC 依赖与 PostgreSQL 数据源配置 (#13)
+2100371 | Li Yipeng | 19:07 | docs: 新增 Alpha 冒烟测试用例表 v0.1，35 条 + L1/L2/L3 分层 (#24)
+b687747 | 刘征 | 16:35 | docs:README补充改建表SQL需docker compose down -v才能生效(#21)
+```
+
+### 在功能分支上，尚未合入 master
+
+```
+b8aea63 | hexag0n | 09:35 | feat: 实现文献列表页 (#10)
+b9e8ebc | hexag0n | 09:11 | Merge branch 'feature/9-upload-validation' into feature/10-literature-list
+```
+
+## 全期提交（自 10-24，按人）
+
+```
+    13	林子航
+     4	hexag0n
+     2	Cheongfan
+     2	Linyuue
+     2	刘征
+     1	Li Yipeng
+     1	杨靖
+```
+
+## 每人最后一次提交
+
+| 成员 | 最后提交 |
+|---|---|
+| 林子航 P1 | **无提交** |
+| 杨靖 P2 | **无提交** |
+| 杨绎平 P3 | **无提交** |
+| 刘万礼 P4 | **无提交** |
+| 吴啸天 P5 | **无提交** |
+| 刘征 P6 | **无提交** |
+| 李义朋 P7 | **无提交** |
