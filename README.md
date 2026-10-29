@@ -39,15 +39,19 @@ docker compose logs -f postgres
 ```
 
 > 应用服务（frontend / backend / ai-service）容器尚未接入，见 `docker-compose.yml` 内 TODO。待各自 Dockerfile 就绪后启用，目标是一条 `docker compose up` 起全栈（Issue #2）。
+>
+> 改过 SQL 必须 `docker compose down -v` 才生效。
 
 ## 分支规范（双分支）
 
 | 分支 | 职责 | 谁能动 |
 |---|---|---|
-| `master` | 日常集成：功能提交、修改、修复全部进这里 | **全体成员**，直接推送或走 feature 分支合入 |
+| `master` | 日常集成：功能提交、修改、修复全部进这里 | **全体成员**，直接推送或走 feature 分支合入（分支合入由本人自行操作，不需等组长） |
 | `release` | 交付/答辩版本：每组评审通过后才升级一次 | **仅组长林子航**，成员禁止推送 |
 
-- 成员可选走 `feature/<issue号>-<简述>` 分支（如 `feature/5-pdfjs-render`）再合入 `master`
+- **开发方式自由**：可以直接推 `master`，也可以走 `feature/<issue号>-<简述>` 分支（如 `feature/5-pdfjs-render`）——**允许在分支上慢慢开发，不必每天合**
+- **合入时机**：本人认为这条 Issue 做完、能演示了，自己把分支合进 `master`，不需要等组长审批
+- **交付口径**：`release` 才是交付版本，由组长在验收节点合并；`master` 一直是"能跑的最新集成版"
 - `release` 只在 Alpha / Beta / RC 三个验收节点由组长合并，合并后在 commit message 标注版本
 - 不设长期 `develop` 分支（7 人 2.5 周，避免分支漂移）
 
