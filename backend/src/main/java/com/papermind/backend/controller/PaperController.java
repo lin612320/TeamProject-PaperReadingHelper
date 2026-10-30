@@ -41,9 +41,22 @@ public class PaperController {
             throw new BizException(ErrorCode.INVALID_PARAM);
         }
 
+        List<Map<String, Object>> items = jdbcTemplate.queryForList(
+            "SELECT id, title, filename, "
+                + "page_count AS \"pageCount\", "
+                + "parse_status AS \"parseStatus\", "
+                + "source, "
+                + "to_char(created_at, 'YYYY-MM-DD\"T\"HH24:MI:SS') AS \"createdAt\" "
+                + "FROM papers WHERE user_id = 1 "
+                + "ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            size, (page - 1) * size);
+
+        Integer total = jdbcTemplate.queryForObject(
+            "SELECT count(*) FROM papers WHERE user_id = 1", Integer.class);
+
         Map<String, Object> data = new HashMap<>();
-        data.put("total", 0);
-        data.put("items", List.of());
+        data.put("total", total);
+        data.put("items", items);
         return ApiResponse.ok(data);
     }
 
