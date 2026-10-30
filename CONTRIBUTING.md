@@ -145,3 +145,16 @@ git push
 [ ] 已更新对应 Issue 状态
 [ ] 改动范围在自己模块内（见 docs/团队分工明细.md 越界红线）
 ```
+---
+
+## 数据与密钥安全（红线）
+
+| # | 规则 | 反例 | 正确做法 |
+|---|---|---|---|
+| 1 | **接口不得返回服务器绝对路径** | `"path": "C:/Users/xxx/data/uploads/a.pdf"` | 只返回 `id`，取文件走 `GET /api/papers/{id}/file` |
+| 2 | **代码里引用路径用相对路径** | `C:\Users\86180\Desktop\...` | `Path.of("uploads")` / `${UPLOAD_DIR:/data/uploads}` |
+| 3 | **数据库密码不写死** | `spring.datasource.password=papermind_dev` | `${DB_PASSWORD:本地默认值}`，部署时用环境变量覆盖 |
+| 4 | **API Key 走 .env** | 把 `sk-xxx` 写在代码或 properties 里 | `.env` 本地保存（已在 .gitignore），仓库只放 `.env.example` |
+| 5 | **上传目录必须挂卷** | 容器内相对路径，重启即丢 | `docker-compose.yml` 挂 `uploads:/data/uploads` |
+
+**自查一句话**：这份文件如果明天公开，会不会暴露我的电脑路径、密码或密钥？会，就不能提交。
