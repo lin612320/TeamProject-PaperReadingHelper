@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { getPapers, getPaper } from '../api/papers'
 
 const papers = ref([])
+const total = ref(0)
 const loading = ref(false)
 const errorMessage = ref('')
 const refreshing = ref(false)
@@ -50,7 +51,9 @@ async function loadPapers(showLoading = true) {
   errorMessage.value = ''
 
   try {
-    papers.value = await getPapers(1, 20)
+    const result = await getPapers(1, 20)
+    papers.value = result.items
+    total.value = result.total
   } catch (error) {
     errorMessage.value =
       error.message || '文献列表加载失败，请稍后重试'
@@ -239,7 +242,7 @@ onUnmounted(() => {
     </section>
 
     <footer v-if="papers.length > 0" class="list-footer">
-      共 {{ papers.length }} 篇文献（当前显示前 20 篇）
+      共 {{ total }} 篇文献（当前显示前 {{ papers.length }} 篇）
     </footer>
   </main>
 </template>

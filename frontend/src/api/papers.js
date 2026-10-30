@@ -22,7 +22,7 @@ export async function getPapers(page = 1, size = 20) {
     `/api/papers?page=${page}&size=${size}`
   )
 
-  return data?.items ?? []
+  return { items: data?.items ?? [], total: data?.total ?? 0 }
 }
 
 // 获取单篇文献详情，用于查询解析状态

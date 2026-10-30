@@ -242,9 +242,17 @@ watch(
 )
 
 onBeforeUnmount(() => {
-  renderTasks.forEach((task) => task.cancel())
+  renderTasks.forEach((task) => {
+    try {
+      task.cancel()
+    } catch {
+      // 渲染任务可能已自行结束，忽略取消异常
+    }
+  })
   renderTasks = []
-  pdfDoc.value?.destroy()
+  if (typeof pdfDoc.value?.destroy === 'function') {
+    pdfDoc.value.destroy()
+  }
   pdfDoc.value = null
   canvasEls.clear()
 })
