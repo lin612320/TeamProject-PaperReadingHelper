@@ -3,23 +3,39 @@ package com.papermind.backend.controller;
 import com.papermind.backend.common.ApiResponse;
 import com.papermind.backend.common.BizException;
 import com.papermind.backend.common.ErrorCode;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/papers")
 public class PaperController {
 
+    @Value("${app.upload-dir}")
+    private String uploadDir;
+
+    private final JdbcTemplate jdbcTemplate;
+
+    public PaperController(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
     @GetMapping
     public ApiResponse<Map<String, Object>> list(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size) {
+        @RequestParam(defaultValue = "1") int page,
+        @RequestParam(defaultValue = "20") int size) {
 
         if (page < 1 || size < 1 || size > 100) {
             throw new BizException(ErrorCode.INVALID_PARAM);
@@ -28,6 +44,56 @@ public class PaperController {
         Map<String, Object> data = new HashMap<>();
         data.put("total", 0);
         data.put("items", List.of());
+        return ApiResponse.ok(data);
+    }
+
+    @PostMapping
+    public ApiResponse<Map<String, Object>> upload(@RequestParam("file") MultipartFile file) {
+
+        // 1. 校验
+        if (file.isEmpty()) {
+            throw new BizException(ErrorCode.INVALID_PARAM);
+        }
+
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.equals("application/pdf")) {
+            throw new BizException(ErrorCode.FILE_NOT_PDF);
+        }
+
+        // 2. 存盘
+        File dir = new File(uploadDir);
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw new BizException(ErrorCode.STORAGE_ERROR);
+        }
+
+        String savedName = UUID.randomUUID() + ".pdf";
+        File target = new File(dir, savedName);
+        try {
+            file.transferTo(target.getAbsoluteFile());
+        } catch (IOException e) {
+            throw new BizException(ErrorCode.STORAGE_ERROR);
+        }
+
+        // 3. 写数据库
+        String originalName = file.getOriginalFilename();
+        String title = (originalName != null && originalName.contains("."))
+            ? originalName.substring(0, originalName.lastIndexOf('.'))
+            : originalName;
+
+        Long newId = jdbcTemplate.queryForObject(
+            "INSERT INTO papers (title, filename, file_path, file_size_bytes, parse_status) "
+                + "VALUES (?, ?, ?, ?, 'pending') RETURNING id",
+            Long.class,
+            title, originalName, target.getAbsolutePath(), file.getSize());
+
+        // 4. 返回
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", newId);
+        data.put("title", title);
+        data.put("filename", originalName);
+        data.put("size", file.getSize());
+        data.put("path", target.getAbsolutePath());
+        data.put("parseStatus", "pending");
         return ApiResponse.ok(data);
     }
 }
