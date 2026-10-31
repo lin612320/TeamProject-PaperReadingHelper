@@ -9,7 +9,7 @@
 import os
 import sys
 
-from app.services.pdf_parser import extract_blocks
+from app.services.pdf_extractor import extract_blocks
 
 
 def main():
