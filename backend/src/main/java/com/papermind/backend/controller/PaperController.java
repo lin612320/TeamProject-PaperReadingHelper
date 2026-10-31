@@ -3,9 +3,12 @@ package com.papermind.backend.controller;
 import com.papermind.backend.common.ApiResponse;
 import com.papermind.backend.common.BizException;
 import com.papermind.backend.common.ErrorCode;
+import com.papermind.backend.service.ParseService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -27,9 +30,11 @@ public class PaperController {
     private String uploadDir;
 
     private final JdbcTemplate jdbcTemplate;
+    private final ParseService parseService;
 
-    public PaperController(JdbcTemplate jdbcTemplate) {
+    public PaperController(JdbcTemplate jdbcTemplate, ParseService parseService) {
         this.jdbcTemplate = jdbcTemplate;
+        this.parseService = parseService;
     }
 
     @GetMapping
@@ -58,6 +63,31 @@ public class PaperController {
         data.put("total", total);
         data.put("items", items);
         return ApiResponse.ok(data);
+    }
+
+    @GetMapping("/{paperId}")
+    public ApiResponse<Map<String, Object>> detail(@PathVariable Long paperId) {
+
+        Map<String, Object> row;
+        try {
+            row = jdbcTemplate.queryForMap(
+                "SELECT id, title, filename, "
+                    + "page_count AS \"pageCount\", "
+                    + "chunk_count AS \"chunkCount\", "
+                    + "parse_status AS \"parseStatus\", "
+                    + "parse_error AS \"parseError\", "
+                    + "source, doi, "
+                    + "arxiv_id AS \"arxivId\", "
+                    + "external_url AS \"externalUrl\", "
+                    + "file_size_bytes AS \"fileSize\", "
+                    + "to_char(created_at, 'YYYY-MM-DD\"T\"HH24:MI:SS') AS \"createdAt\" "
+                    + "FROM papers WHERE id = ? AND user_id = 1",
+                paperId);
+        } catch (EmptyResultDataAccessException e) {
+            throw new BizException(ErrorCode.PAPER_NOT_FOUND);
+        }
+
+        return ApiResponse.ok(row);
     }
 
     @PostMapping
@@ -99,7 +129,10 @@ public class PaperController {
             Long.class,
             title, originalName, target.getAbsolutePath(), file.getSize());
 
-        // 4. 返回
+        // 4. 触发异步解析（当前为 mock）
+        parseService.parseAsync(newId, target.getAbsolutePath());
+
+        // 5. 返回
         Map<String, Object> data = new HashMap<>();
         data.put("id", newId);
         data.put("title", title);
