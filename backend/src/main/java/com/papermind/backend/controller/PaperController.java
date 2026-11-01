@@ -21,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.List;
@@ -72,40 +73,15 @@ public class PaperController {
 
     @GetMapping("/{paperId}")
     public ApiResponse<Map<String, Object>> detail(@PathVariable Long paperId) {
-
-        Map<String, Object> row;
-        try {
-            row = jdbcTemplate.queryForMap(
-                "SELECT id, title, filename, "
-                    + "page_count AS \"pageCount\", "
-                    + "chunk_count AS \"chunkCount\", "
-                    + "parse_status AS \"parseStatus\", "
-                    + "parse_error AS \"parseError\", "
-                    + "source, doi, "
-                    + "arxiv_id AS \"arxivId\", "
-                    + "external_url AS \"externalUrl\", "
-                    + "file_size_bytes AS \"fileSize\", "
-                    + "to_char(created_at, 'YYYY-MM-DD\"T\"HH24:MI:SS') AS \"createdAt\" "
-                    + "FROM papers WHERE id = ? AND user_id = 1",
-                paperId);
-        } catch (EmptyResultDataAccessException e) {
-            throw new BizException(ErrorCode.PAPER_NOT_FOUND);
-        }
-
-        return ApiResponse.ok(row);
+        return ApiResponse.ok(loadDetail(paperId));
     }
 
     @GetMapping("/{paperId}/file")
     public ResponseEntity<byte[]> file(@PathVariable Long paperId) {
 
-        String filePath;
-        try {
-            filePath = jdbcTemplate.queryForObject(
-                "SELECT file_path FROM papers WHERE id = ? AND user_id = 1",
-                String.class, paperId);
-        } catch (EmptyResultDataAccessException e) {
-            throw new BizException(ErrorCode.PAPER_NOT_FOUND);
-        }
+        String filePath = jdbcTemplate.queryForObject(
+            "SELECT file_path FROM papers WHERE id = ? AND user_id = 1",
+            String.class, paperId);
 
         File pdf = new File(filePath);
         if (!pdf.exists()) {
@@ -128,23 +104,17 @@ public class PaperController {
     @DeleteMapping("/{paperId}")
     public ApiResponse<Void> delete(@PathVariable Long paperId) {
 
-        String filePath = null;
-        try {
-            filePath = jdbcTemplate.queryForObject(
-                "SELECT file_path FROM papers WHERE id = ? AND user_id = 1",
-                String.class, paperId);
-        } catch (EmptyResultDataAccessException e) {
-            throw new BizException(ErrorCode.PAPER_NOT_FOUND);
-        }
+        String filePath = jdbcTemplate.queryForObject(
+            "SELECT file_path FROM papers WHERE id = ? AND user_id = 1",
+            String.class, paperId);
 
-        // chunks 由数据库 ON DELETE CASCADE 自动清理
         jdbcTemplate.update("DELETE FROM papers WHERE id = ? AND user_id = 1", paperId);
 
         if (filePath != null) {
             try {
                 Files.deleteIfExists(new File(filePath).toPath());
             } catch (IOException ignored) {
-                // 删文件失败不影响数据库删除，细节留日志即可
+                // 删文件失败不影响数据库删除
             }
         }
 
@@ -158,8 +128,8 @@ public class PaperController {
             throw new BizException(ErrorCode.INVALID_PARAM);
         }
 
-        String contentType = file.getContentType();
-        if (contentType == null || !contentType.equals("application/pdf")) {
+        // BUG-004：不只看 Content-Type，还要看文件头是不是 %PDF
+        if (!isPdf(file)) {
             throw new BizException(ErrorCode.FILE_NOT_PDF);
         }
 
@@ -189,13 +159,41 @@ public class PaperController {
 
         parseService.parseAsync(newId, target.getAbsolutePath());
 
-        Map<String, Object> data = new HashMap<>();
-        data.put("id", newId);
-        data.put("title", title);
-        data.put("filename", originalName);
-        data.put("size", file.getSize());
-        data.put("path", target.getAbsolutePath());
-        data.put("parseStatus", "pending");
-        return ApiResponse.ok(data);
+        // BUG-002 / BUG-003：直接返回契约规定的 PaperDetail，不再暴露 path / size
+        return ApiResponse.ok(loadDetail(newId));
+    }
+
+    private Map<String, Object> loadDetail(Long paperId) {
+        try {
+            return jdbcTemplate.queryForMap(
+                "SELECT id, title, filename, "
+                    + "page_count AS \"pageCount\", "
+                    + "chunk_count AS \"chunkCount\", "
+                    + "parse_status AS \"parseStatus\", "
+                    + "parse_error AS \"parseError\", "
+                    + "source, doi, "
+                    + "arxiv_id AS \"arxivId\", "
+                    + "external_url AS \"externalUrl\", "
+                    + "file_size_bytes AS \"fileSize\", "
+                    + "to_char(created_at, 'YYYY-MM-DD\"T\"HH24:MI:SS') AS \"createdAt\" "
+                    + "FROM papers WHERE id = ? AND user_id = 1",
+                paperId);
+        } catch (EmptyResultDataAccessException e) {
+            throw new BizException(ErrorCode.PAPER_NOT_FOUND);
+        }
+    }
+
+    private boolean isPdf(MultipartFile file) {
+        try (InputStream in = file.getInputStream()) {
+            byte[] head = new byte[5];
+            int n = in.read(head);
+            return n >= 4
+                && head[0] == 0x25   // %
+                && head[1] == 0x50   // P
+                && head[2] == 0x44   // D
+                && head[3] == 0x46;  // F
+        } catch (IOException e) {
+            return false;
+        }
     }
 }
