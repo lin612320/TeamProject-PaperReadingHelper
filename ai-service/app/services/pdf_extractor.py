@@ -7,15 +7,20 @@ import pymupdf
 
 def extract_blocks(pdf_path):
     """从指定路径抽取pdf的文字块和页数。
+
     参数:
         pdf_path: 指定路径
-    返回值:
+
+    返回:
         blocks：返回的PyMuPDF文字块
         total_pages：返回的pdf总页数
     """
     blocks = []
     # 以 PyMuPDF 的方式打开.pdf文件
     with pymupdf.open(pdf_path) as pdf:
+        # PyMuPDF 能打开多种格式（如文本、Markdown），这里只接受真正的 PDF
+        if not pdf.is_pdf:
+            raise ValueError("不是 PDF 文件: " + str(pdf_path))
 
         # 通过 page_count 方法获取pdf页数
         total_pages = pdf.page_count

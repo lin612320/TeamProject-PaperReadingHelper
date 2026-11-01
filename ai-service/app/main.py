@@ -4,6 +4,7 @@ import psycopg
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from app.routers import paper
 
 load_dotenv()
 
@@ -16,7 +17,7 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "bge-m3")
 VECTOR_DIM = int(os.getenv("VECTOR_DIM", "1024"))
 
 app = FastAPI(title="PaperMind AI Service")
-
+app.include_router(paper.router)
 
 def check_db():
     conn = None
