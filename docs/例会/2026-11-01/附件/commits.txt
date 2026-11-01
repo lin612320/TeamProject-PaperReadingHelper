@@ -1,0 +1,19 @@
+﻿PaperMind Alpha · 第 6 天站会（2026-11-01）签入记录
+统计口径：最后一次例会记录提交 0497366 之后至 HEAD（不用 --since，避免日期剪枝漏提交）
+仓库：lin612320/TeamProject-PaperReadingHelper   分支：master
+导出时间：2026-11-01 20:18:11
+提交数：13
+
+e9f736c | 11-01 20:16 | 林子航 | docs: 记录 D5/D6 燃尽数据（实际 17/17）并生成 D6 燃尽图 (#3)
+d8c4397 | 11-01 19:13 | Linyuue | fix: 修复冒烟问题（上传响应结构、PDF 文件头校验、超限返回 1003、请求日志）(#13 #14)
+8e83d38 | 11-01 18:54 | Linyuue | feat: 文献删除、PDF 文件流与解析服务 mock/真实调用切换 (#13 #14)
+0c4f41f | 11-01 16:25 | Li Yipeng | test: 冒烟首轮执行完成（8 通过/4 不通过/3 测不了），新增 BugList 7 条 (#24 #25)
+3f9604c | 11-01 16:19 | Li Yipeng | test: 冒烟首轮执行完成（8 通过/4 不通过/3 测不了），新增 BugList 7 条 (#24 #25)
+8ecb98c | 11-01 13:05 | 刘征 | feat: 后端接入Redis能存能取，连接地址走环境变量 (#22)
+e7526f5 | 10-31 22:38 | Linyuue | feat: 异步解析流程与文献详情接口 (#13 #14)
+14a64f0 | 10-31 17:35 | Cheongfan | feat: 对外接口实现-内部论文解析与清理 (#18)
+b54650f | 10-31 17:34 | Cheongfan | feat: 论文切片与 Embedding 写入 chunks 表 (#18)
+0ce4c46 | 10-31 17:33 | Cheongfan | fix: PDF 抽取只接受合法 PDF 并更名 pdf_extractor (#17)
+93e3fa0 | 10-30 22:43 | Yang Yiping | feat: 完成问答侧栏的加载状态、错误提示及重试功能 (#11)
+5a436cb | 10-30 22:34 | hexag0n | fix: 修复阅读文献界面返回文献列表的跳转问题(#11)
+2292113 | 10-30 21:54 | hexag0n | feat: Q&A sidebar loading/error/retry states (#11)
