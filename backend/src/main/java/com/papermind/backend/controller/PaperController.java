@@ -6,7 +6,11 @@ import com.papermind.backend.common.ErrorCode;
 import com.papermind.backend.service.ParseService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -90,10 +95,65 @@ public class PaperController {
         return ApiResponse.ok(row);
     }
 
+    @GetMapping("/{paperId}/file")
+    public ResponseEntity<byte[]> file(@PathVariable Long paperId) {
+
+        String filePath;
+        try {
+            filePath = jdbcTemplate.queryForObject(
+                "SELECT file_path FROM papers WHERE id = ? AND user_id = 1",
+                String.class, paperId);
+        } catch (EmptyResultDataAccessException e) {
+            throw new BizException(ErrorCode.PAPER_NOT_FOUND);
+        }
+
+        File pdf = new File(filePath);
+        if (!pdf.exists()) {
+            throw new BizException(ErrorCode.PAPER_NOT_FOUND);
+        }
+
+        byte[] bytes;
+        try {
+            bytes = Files.readAllBytes(pdf.toPath());
+        } catch (IOException e) {
+            throw new BizException(ErrorCode.STORAGE_ERROR);
+        }
+
+        return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_PDF)
+            .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + paperId + ".pdf\"")
+            .body(bytes);
+    }
+
+    @DeleteMapping("/{paperId}")
+    public ApiResponse<Void> delete(@PathVariable Long paperId) {
+
+        String filePath = null;
+        try {
+            filePath = jdbcTemplate.queryForObject(
+                "SELECT file_path FROM papers WHERE id = ? AND user_id = 1",
+                String.class, paperId);
+        } catch (EmptyResultDataAccessException e) {
+            throw new BizException(ErrorCode.PAPER_NOT_FOUND);
+        }
+
+        // chunks 由数据库 ON DELETE CASCADE 自动清理
+        jdbcTemplate.update("DELETE FROM papers WHERE id = ? AND user_id = 1", paperId);
+
+        if (filePath != null) {
+            try {
+                Files.deleteIfExists(new File(filePath).toPath());
+            } catch (IOException ignored) {
+                // 删文件失败不影响数据库删除，细节留日志即可
+            }
+        }
+
+        return ApiResponse.ok(null);
+    }
+
     @PostMapping
     public ApiResponse<Map<String, Object>> upload(@RequestParam("file") MultipartFile file) {
 
-        // 1. 校验
         if (file.isEmpty()) {
             throw new BizException(ErrorCode.INVALID_PARAM);
         }
@@ -103,7 +163,6 @@ public class PaperController {
             throw new BizException(ErrorCode.FILE_NOT_PDF);
         }
 
-        // 2. 存盘
         File dir = new File(uploadDir);
         if (!dir.exists() && !dir.mkdirs()) {
             throw new BizException(ErrorCode.STORAGE_ERROR);
@@ -117,7 +176,6 @@ public class PaperController {
             throw new BizException(ErrorCode.STORAGE_ERROR);
         }
 
-        // 3. 写数据库
         String originalName = file.getOriginalFilename();
         String title = (originalName != null && originalName.contains("."))
             ? originalName.substring(0, originalName.lastIndexOf('.'))
@@ -129,10 +187,8 @@ public class PaperController {
             Long.class,
             title, originalName, target.getAbsolutePath(), file.getSize());
 
-        // 4. 触发异步解析（当前为 mock）
         parseService.parseAsync(newId, target.getAbsolutePath());
 
-        // 5. 返回
         Map<String, Object> data = new HashMap<>();
         data.put("id", newId);
         data.put("title", title);
