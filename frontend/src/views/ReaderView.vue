@@ -14,6 +14,26 @@ const paperId = Number(route.params.paperId)
 const PDF_API_BASE = import.meta.env.VITE_API_BASE || ''
 const FALLBACK_SAMPLE = '/sample.pdf'
 
+// 将 pdf.js 抛出的技术错误转换为人话
+function formatPdfError(error) {
+  const msg = error?.message || ''
+  // 已经是中文人话（如开发提示），直接返回
+  if (/[\u4e00-\u9fa5]/.test(msg)) return msg
+  if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('server response')) {
+    return '无法连接到服务器，请检查网络或后端服务是否启动'
+  }
+  if (msg.includes('Invalid PDF') || msg.includes('Invalid structure') || msg.includes('corrupt')) {
+    return '这份 PDF 文件已损坏或格式不支持，无法打开'
+  }
+  if (msg.includes('password') || msg.includes('Password')) {
+    return '这份 PDF 已加密，请提供密码后再试'
+  }
+  if (msg.includes('RenderingCancelled')) {
+    return ''
+  }
+  return 'PDF 加载失败，请稍后重试'
+}
+
 const canvasEls = new Map()
 const pdfLoading = ref(true)
 const pdfErrorMessage = ref('')
@@ -73,9 +93,8 @@ async function renderAllPages() {
       renderedPages.value = pageNumber
     }
   } catch (error) {
-    if (error?.name !== 'RenderingCancelledException') {
-      pdfErrorMessage.value = error?.message || 'PDF 渲染失败'
-    }
+    const friendly = formatPdfError(error)
+    if (friendly) pdfErrorMessage.value = friendly
   } finally {
     pdfLoading.value = false
   }
@@ -94,7 +113,8 @@ async function loadDocument() {
     await nextTick()
     await renderAllPages()
   } catch (error) {
-    pdfErrorMessage.value = `无法打开这份 PDF：${error?.message || '未知错误'}`
+    const friendly = formatPdfError(error)
+    pdfErrorMessage.value = friendly || '无法打开这份 PDF，请稍后重试'
     pdfLoading.value = false
   }
 }

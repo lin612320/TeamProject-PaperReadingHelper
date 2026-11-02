@@ -1,16 +1,56 @@
 const API_BASE = import.meta.env.VITE_API_BASE || ''
 
-// 统一处理后端返回结果
-async function request(url) {
-  const response = await fetch(`${API_BASE}${url}`)
-  const result = await response.json().catch(() => null)
-
-  if (!response.ok) {
-    throw new Error(result?.message || `请求失败（HTTP ${response.status}）`)
+// 将各种异常统一转换为人话
+function formatApiError(error, response, result) {
+  if (error?.name === 'AbortError') {
+    return new Error('请求超时，请稍后重试')
   }
 
-  if (!result || result.code !== 0) {
-    throw new Error(result?.message || '服务器返回了异常结果')
+  if (error instanceof TypeError) {
+    return new Error('网络连接失败，请检查网络或后端服务是否启动')
+  }
+
+  if (response && !response.ok) {
+    const status = response.status
+    const friendlyMap = {
+      400: '请求参数有误，请检查输入',
+      401: '登录已失效，请重新登录',
+      403: '没有权限执行此操作',
+      404: '请求的资源不存在',
+      413: '文件过大，请选择更小的文件',
+      422: '提交的数据格式有误',
+      429: '请求过于频繁，请稍后再试',
+      500: '服务器内部错误，请稍后重试',
+      502: '服务器暂时不可用，请稍后重试',
+      503: '服务器正在维护，请稍后重试',
+      504: '服务器响应超时，请稍后重试',
+    }
+    const msg = friendlyMap[status] || result?.message
+    if (msg) return new Error(msg)
+    return new Error(`请求失败（HTTP ${status}）`)
+  }
+
+  if (result && result.code !== 0) {
+    return new Error(result.message || '操作失败，请稍后重试')
+  }
+
+  if (error instanceof Error) return error
+  return new Error('操作失败，请稍后重试')
+}
+
+// 统一处理后端返回结果
+async function request(url) {
+  let response
+  let result
+  try {
+    response = await fetch(`${API_BASE}${url}`)
+    result = await response.json().catch(() => null)
+  } catch (error) {
+    throw formatApiError(error)
+  }
+
+  if (!response.ok || !result || result.code !== 0) {
+    throw formatApiError(null, response, result)
   }
 
   return result.data
@@ -58,9 +98,23 @@ export function uploadPaper(file, onProgress) {
 
       if (xhr.status >= 200 && xhr.status < 300 && result?.code === 0) {
         resolve(result.data)
-      } else {
-        reject(new Error(result?.message || `请求失败（HTTP ${xhr.status}）`))
+        return
       }
+
+      const statusFriendly = {
+        400: '请求参数有误，请检查输入',
+        401: '登录已失效，请重新登录',
+        403: '没有权限执行此操作',
+        404: '请求的资源不存在',
+        413: '文件过大，请选择更小的文件',
+        422: '提交的数据格式有误',
+        429: '请求过于频繁，请稍后再试',
+        500: '服务器内部错误，请稍后重试',
+        502: '服务器暂时不可用，请稍后重试',
+        503: '服务器正在维护，请稍后重试',
+        504: '服务器响应超时，请稍后重试',
+      }
+      reject(new Error(result?.message || statusFriendly[xhr.status] || '上传失败，请稍后重试'))
     })
 
     xhr.addEventListener('error', () => {
@@ -76,31 +130,29 @@ export async function askQuestion(paperId, question) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 25000)
 
+  let response
+  let result
   try {
-    const response = await fetch(`${API_BASE}/api/qa/ask`, {
+    response = await fetch(`${API_BASE}/api/qa/ask`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ paperId, question }),
       signal: controller.signal,
     })
 
-    const result = await response.json().catch(() => null)
-
-    if (!response.ok) {
-      throw new Error(result?.message || `请求失败（HTTP ${response.status}）`)
-    }
-
-    if (!result || result.code !== 0) {
-      throw new Error(result?.message || '服务器返回了异常结果')
-    }
-
-    return result.data
+    result = await response.json().catch(() => null)
   } catch (error) {
-    if (error.name === 'AbortError') {
+    if (error?.name === 'AbortError') {
       throw new Error('AI 服务响应超时（>25s），请稍后重试')
     }
-    throw error
+    throw formatApiError(error)
   } finally {
     clearTimeout(timeoutId)
   }
+
+  if (!response.ok || !result || result.code !== 0) {
+    throw formatApiError(null, response, result)
+  }
+
+  return result.data
 }
