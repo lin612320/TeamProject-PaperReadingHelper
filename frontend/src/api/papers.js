@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080'
+const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 // 统一处理后端返回结果
 async function request(url) {
@@ -28,6 +28,47 @@ export async function getPapers(page = 1, size = 20) {
 // 获取单篇文献详情，用于查询解析状态
 export async function getPaper(paperId) {
   return request(`/api/papers/${encodeURIComponent(paperId)}`)
+}
+
+// 上传 PDF 文献（支持上传进度回调）
+export function uploadPaper(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `${API_BASE}/api/papers`)
+
+    if (onProgress) {
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          onProgress(Math.round((event.loaded / event.total) * 100))
+        }
+      })
+    }
+
+    xhr.addEventListener('load', () => {
+      let result = null
+      try {
+        result = JSON.parse(xhr.responseText)
+      } catch {
+        reject(new Error('服务器返回了无法解析的响应'))
+        return
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300 && result?.code === 0) {
+        resolve(result.data)
+      } else {
+        reject(new Error(result?.message || `请求失败（HTTP ${xhr.status}）`))
+      }
+    })
+
+    xhr.addEventListener('error', () => {
+      reject(new Error('网络连接失败，请检查后端服务是否启动'))
+    })
+
+    xhr.send(formData)
+  })
 }
 
 // 针对单篇论文提问（25 秒超时，超过则中止并抛错）

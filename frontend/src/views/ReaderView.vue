@@ -11,7 +11,7 @@ const route = useRoute()
 const paperId = Number(route.params.paperId)
 
 
-const PDF_API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080'
+const PDF_API_BASE = import.meta.env.VITE_API_BASE || ''
 const FALLBACK_SAMPLE = '/sample.pdf'
 
 const canvasEls = new Map()
@@ -503,7 +503,7 @@ onBeforeUnmount(() => {
   opacity: 1;
 }
 
-/* ===== 共用状态卡片 ===== */
+/*共用状态卡片 */
 .state-card {
   flex: 1;
   display: flex;
@@ -551,7 +551,7 @@ onBeforeUnmount(() => {
   cursor: not-allowed;
 }
 
-/* ===== 右侧 Q&A 侧栏 ===== */
+/*右侧 Q&A 侧栏*/
 .qa-sidebar {
   width: 400px;
   min-width: 320px;
