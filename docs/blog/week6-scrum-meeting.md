@@ -1,8 +1,9 @@
-# 七仙过海 · Alpha 冲刺第 6 周 Scrum Meeting 记录
+﻿# 七仙过海 · Alpha 冲刺第 6 周 Scrum Meeting 记录
 
 > 团队：七仙过海 · 项目：PaperMind 论文阅读助手 · 中国海洋大学 软件工程
 > 迭代：Alpha 阶段（第 5–8 周，D1–D15）· 本周覆盖：第 6 周（2026-10-27 至 2026-11-01）
 > 代码仓库：https://github.com/lin612320/TeamProject-PaperReadingHelper
+> 发布地址：https://www.cnblogs.com/7ICS/p/23514909.html
 
 ---
 
@@ -232,3 +233,4 @@ Alpha 阶段的目标是一条**能跑通的主链**：上传 PDF → 浏览器�
 | 数据    | PostgreSQL + pgvector    | 4 张表、`CHECK` 锁枚举、级联删除、`vector(1024)` 列                                |
 | 部署    | Docker Compose + Redis   | `healthcheck`、命名卷（改 SQL 要 `down -v` 才生效）、连接地址走环境变量                    |
 | 协作与测试 | Git / PR / curl          | 分支开发，部分走 PR（如 #34），多数直接合入 master；commit 带 Issue 编号；用 `curl` 直测接口，不等前端 |
+
