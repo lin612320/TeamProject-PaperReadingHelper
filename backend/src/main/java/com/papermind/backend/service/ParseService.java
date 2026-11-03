@@ -24,10 +24,6 @@ public class ParseService {
     @Value("${app.parse.force:false}")
     private boolean force;
 
-    /** 解析接口超时（秒）。P5 首次要加载模型 + 逐段 embedding，25 秒不够 */
-    @Value("${app.parse.timeout-seconds:180}")
-    private long parseTimeoutSeconds;
-
     @Value("${app.ai-service.url:http://localhost:8000}")
     private String aiServiceUrl;
 
@@ -65,7 +61,7 @@ public class ParseService {
 
                 java.net.http.HttpRequest httpRequest = java.net.http.HttpRequest.newBuilder()
                     .uri(java.net.URI.create(aiServiceUrl + "/internal/papers/parse"))
-                    .timeout(java.time.Duration.ofSeconds(parseTimeoutSeconds))
+                    .timeout(java.time.Duration.ofSeconds(25))
                     .header("Content-Type", "application/json; charset=utf-8")
                     .POST(java.net.http.HttpRequest.BodyPublishers.ofString(
                         json, java.nio.charset.StandardCharsets.UTF_8))
