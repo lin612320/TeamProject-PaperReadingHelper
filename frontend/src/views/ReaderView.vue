@@ -734,7 +734,7 @@ onBeforeUnmount(() => {
   opacity: 1;
 }
 
-//===== #6 翻页 / 缩放 ===== 
+/* ===== #6 翻页 / 缩放 ===== */
 .reader-bar {
   flex-wrap: wrap;
 }
@@ -785,7 +785,7 @@ onBeforeUnmount(() => {
   border-color: #2563eb;
 }
 
-// 去掉 number 输入框的上下箭头，省出宽度 
+/* 去掉 number 输入框的上下箭头，省出宽度 */
 .page-input::-webkit-outer-spin-button,
 .page-input::-webkit-inner-spin-button {
   margin: 0;
@@ -806,7 +806,7 @@ onBeforeUnmount(() => {
   text-align: center;
 }
 
-// 放大超出面板宽度时允许横向滚动；默认仍按宽度自适应 
+/* 放大超出面板宽度时允许横向滚动；默认仍按宽度自适应 */
 .canvas-wrap {
   overflow: auto;
 }
