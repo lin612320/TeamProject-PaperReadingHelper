@@ -14,9 +14,6 @@ class ParseRequest(BaseModel):
     filePath: str
     force: bool = False
 
-def error_body(code, message):
-    return {"code": code, "message": message, "detail": None}
-
 @router.post("/internal/papers/parse")
 def parse_paper(body: ParseRequest):
     # 先确认论文存在（契约要求）
@@ -28,7 +25,7 @@ def parse_paper(body: ParseRequest):
     if not exists:
         return JSONResponse(
             status_code = 404,
-            content = error_body("PAPER_NOT_FOUND", "论文不存在"),
+            content = {"code": "PAPER_NOT_FOUND", "message": "论文不存在", "detail": None},
         )
 
     try:
@@ -40,7 +37,7 @@ def parse_paper(body: ParseRequest):
             status = 500
         return JSONResponse(
             status_code=status,
-            content=error_body(e.code, e.message),
+            content={"code": e.code, "message": e.message, "detail": None},
         )
 
     return result

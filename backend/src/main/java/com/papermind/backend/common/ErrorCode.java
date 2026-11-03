@@ -11,7 +11,7 @@ public enum ErrorCode {
     PAPER_NOT_READY(2002, 409, "文献尚未解析完成，暂时无法提问"),
     EMPTY_QUESTION(2003, 422, "问题不能为空"),
     AI_SERVICE_ERROR(3001, 502, "AI 服务调用失败"),
-    AI_SERVICE_TIMEOUT(3002, 504, "AI 服务超时（>30s）"),
+    AI_SERVICE_TIMEOUT(3002, 504, "AI 服务超时"),
     STORAGE_ERROR(4001, 500, "文件存储失败"),
     INTERNAL_ERROR(5000, 500, "服务器内部错误");
 

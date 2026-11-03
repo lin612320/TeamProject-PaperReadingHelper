@@ -11,8 +11,28 @@ const route = useRoute()
 const paperId = Number(route.params.paperId)
 
 
-const PDF_API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080'
+const PDF_API_BASE = import.meta.env.VITE_API_BASE || ''
 const FALLBACK_SAMPLE = '/sample.pdf'
+
+// 将 pdf.js 抛出的技术错误转换为人话
+function formatPdfError(error) {
+  const msg = error?.message || ''
+  // 已经是中文人话（如开发提示），直接返回
+  if (/[\u4e00-\u9fa5]/.test(msg)) return msg
+  if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('server response')) {
+    return '无法连接到服务器，请检查网络或后端服务是否启动'
+  }
+  if (msg.includes('Invalid PDF') || msg.includes('Invalid structure') || msg.includes('corrupt')) {
+    return '这份 PDF 文件已损坏或格式不支持，无法打开'
+  }
+  if (msg.includes('password') || msg.includes('Password')) {
+    return '这份 PDF 已加密，请提供密码后再试'
+  }
+  if (msg.includes('RenderingCancelled')) {
+    return ''
+  }
+  return 'PDF 加载失败，请稍后重试'
+}
 
 const canvasEls = new Map()
 const pdfLoading = ref(true)
@@ -24,9 +44,40 @@ const scale = ref(1.4)
 const pdfDoc = shallowRef(null)
 let renderTasks = []
 
+// ===== #6 翻页 / 缩放 =====
+const ZOOM_MIN = 0.6
+const ZOOM_MAX = 2.4
+const ZOOM_STEP = 0.2
+const BASE_SCALE = 1.4 // 自适应宽度时的基准倍率，超过它才允许横向滚动
+
+const scrollContainer = ref(null)
+const pageEls = new Map()
+const currentPage = ref(1)
+const pageInput = ref(1)
+const editingPage = ref(false)
+const zooming = ref(false)
+
+let scrollRafId = 0
+
+const zoomPercent = computed(() => Math.round(scale.value * 100))
+const zoomedIn = computed(() => scale.value > BASE_SCALE + 1e-6)
+const canPrev = computed(() => !pdfLoading.value && currentPage.value > 1)
+const canNext = computed(() => !pdfLoading.value && currentPage.value < pageCount.value)
+const canZoomIn = computed(
+  () => !pdfLoading.value && !zooming.value && scale.value < ZOOM_MAX - 1e-6
+)
+const canZoomOut = computed(
+  () => !pdfLoading.value && !zooming.value && scale.value > ZOOM_MIN + 1e-6
+)
+
 function setCanvasEl(pageNumber, el) {
   if (el) canvasEls.set(pageNumber, el)
   else canvasEls.delete(pageNumber)
+}
+
+function setPageEl(pageNumber, el) {
+  if (el) pageEls.set(pageNumber, el)
+  else pageEls.delete(pageNumber)
 }
 
 async function openDocument() {
@@ -46,12 +97,13 @@ async function openDocument() {
   }
 }
 
-async function renderAllPages() {
+async function renderAllPages({ resetProgress = true } = {}) {
   if (!pdfDoc.value) return
 
   pdfLoading.value = true
   pdfErrorMessage.value = ''
-  renderedPages.value = 0
+  // 缩放重绘时不重置，避免整片画布闪白
+  if (resetProgress) renderedPages.value = 0
 
   try {
     for (let pageNumber = 1; pageNumber <= pdfDoc.value.numPages; pageNumber++) {
@@ -73,9 +125,8 @@ async function renderAllPages() {
       renderedPages.value = pageNumber
     }
   } catch (error) {
-    if (error?.name !== 'RenderingCancelledException') {
-      pdfErrorMessage.value = error?.message || 'PDF 渲染失败'
-    }
+    const friendly = formatPdfError(error)
+    if (friendly) pdfErrorMessage.value = friendly
   } finally {
     pdfLoading.value = false
   }
@@ -87,17 +138,133 @@ async function loadDocument() {
   usingSample.value = false
   pageCount.value = 0
   renderedPages.value = 0
+  currentPage.value = 1
+  pageInput.value = 1
 
   try {
     pdfDoc.value = await openDocument()
     pageCount.value = pdfDoc.value.numPages
     await nextTick()
     await renderAllPages()
+    updateCurrentPage()
   } catch (error) {
-    pdfErrorMessage.value = `无法打开这份 PDF：${error?.message || '未知错误'}`
+    const friendly = formatPdfError(error)
+    pdfErrorMessage.value = friendly || '无法打开这份 PDF，请稍后重试'
     pdfLoading.value = false
   }
 }
+
+// ===== #6 翻页 / 缩放 =====
+
+// 元素相对滚动容器顶部的位置（不依赖 offsetParent，兼容横向滚动） 
+function pageOffsetTop(el, container) {
+  return el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
+}
+
+// 取「视口上部 30% 处」所在页作为当前页 
+function updateCurrentPage() {
+  const container = scrollContainer.value
+  const total = pageCount.value
+  if (!container || !total) return
+
+  const anchorY = container.scrollTop + Math.min(container.clientHeight * 0.3, 240)
+  let page = 1
+
+  for (let n = 1; n <= total; n++) {
+    const el = pageEls.get(n)
+    if (!el) continue
+    if (pageOffsetTop(el, container) <= anchorY) page = n
+    else break
+  }
+
+  currentPage.value = page
+}
+
+function handleScroll() {
+  if (scrollRafId) return
+  scrollRafId = requestAnimationFrame(() => {
+    scrollRafId = 0
+    updateCurrentPage()
+  })
+}
+
+// 滚动到指定页（页码会被夹到 1..pageCount） 
+function goToPage(target, smooth = true) {
+  const container = scrollContainer.value
+  const total = pageCount.value
+  if (!container || !total) return
+
+  const page = Math.min(total, Math.max(1, Math.floor(Number(target)) || 1))
+  const el = pageEls.get(page)
+  if (!el) return
+
+  currentPage.value = page
+  pageInput.value = page
+  container.scrollTo({
+    top: Math.max(0, pageOffsetTop(el, container) - 4),
+    behavior: smooth ? 'smooth' : 'auto',
+  })
+}
+
+// 页码输入框：回车 / 失焦时跳转，非法值回退 
+function commitPageInput() {
+  editingPage.value = false
+  const target = Number(pageInput.value)
+  if (!Number.isFinite(target)) {
+    pageInput.value = currentPage.value
+    return
+  }
+  goToPage(target)
+}
+
+// 缩放前记录「当前页 + 页内偏移比例」，重绘后滚回同一位置 
+function captureAnchor(container) {
+  if (!container) return null
+  const el = pageEls.get(currentPage.value)
+  if (!el) return null
+
+  const top = pageOffsetTop(el, container)
+  const height = el.offsetHeight || 1
+  return {
+    page: currentPage.value,
+    ratio: Math.min(1, Math.max(0, (container.scrollTop - top) / height)),
+  }
+}
+
+function restoreAnchor(container, anchor) {
+  if (!container || !anchor) return
+  const el = pageEls.get(anchor.page)
+  if (!el) return
+  container.scrollTop = Math.max(0, pageOffsetTop(el, container) + anchor.ratio * (el.offsetHeight || 1))
+}
+
+async function changeZoom(delta) {
+  if (pdfLoading.value || zooming.value || !pdfDoc.value) return
+
+  const next = Math.min(
+    ZOOM_MAX,
+    Math.max(ZOOM_MIN, Math.round((scale.value + delta) * 100) / 100)
+  )
+  if (next === scale.value) return
+
+  const container = scrollContainer.value
+  const anchor = captureAnchor(container)
+
+  zooming.value = true
+  scale.value = next
+  try {
+    await renderAllPages({ resetProgress: false })
+    await nextTick()
+    restoreAnchor(container, anchor)
+    updateCurrentPage()
+  } finally {
+    zooming.value = false
+  }
+}
+
+watch(currentPage, (page) => {
+  if (!editingPage.value) pageInput.value = page
+})
 
 // P3: Q&A 侧栏
 const paper = ref(null)
@@ -242,6 +409,10 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  if (scrollRafId) {
+    cancelAnimationFrame(scrollRafId)
+    scrollRafId = 0
+  }
   renderTasks.forEach((task) => {
     try {
       task.cancel()
@@ -264,11 +435,65 @@ onBeforeUnmount(() => {
     <section class="pdf-panel">
       <header class="reader-bar">
         <RouterLink class="back-link" to="/library">← 返回文献列表</RouterLink>
-        <span v-if="pageCount" class="page-info">共 {{ pageCount }} 页</span>
+
+        <!-- #6 翻页 / 跳页 -->
+        <div v-if="pageCount" class="pdf-toolbar">
+          <button
+            class="tool-btn"
+            title="上一页"
+            :disabled="!canPrev"
+            @click="goToPage(currentPage - 1)"
+          >
+            ‹
+          </button>
+
+          <input
+            v-model.number="pageInput"
+            class="page-input"
+            type="number"
+            min="1"
+            :max="pageCount"
+            aria-label="跳转页码"
+            @focus="editingPage = true"
+            @blur="commitPageInput"
+            @keyup.enter="commitPageInput"
+          />
+          <span class="page-total">/ {{ pageCount }}</span>
+
+          <button
+            class="tool-btn"
+            title="下一页"
+            :disabled="!canNext"
+            @click="goToPage(currentPage + 1)"
+          >
+            ›
+          </button>
+        </div>
+
+        <!-- #6 缩放 -->
+        <div v-if="pageCount" class="zoom-toolbar">
+          <button
+            class="tool-btn"
+            title="缩小"
+            :disabled="!canZoomOut"
+            @click="changeZoom(-ZOOM_STEP)"
+          >
+            −
+          </button>
+          <span class="zoom-value">{{ zoomPercent }}%</span>
+          <button
+            class="tool-btn"
+            title="放大"
+            :disabled="!canZoomIn"
+            @click="changeZoom(ZOOM_STEP)"
+          >
+            +
+          </button>
+        </div>
       </header>
 
       <p v-if="usingSample" class="sample-hint">
-        后端 <code>/api/papers/{id}/file</code> 还没就绪，当前显示的是本地示例 PDF。
+        后端接口暂不可用，当前显示的是本地示例 PDF。
       </p>
 
       <!-- 文献元数据失败不阻塞 PDF -->
@@ -289,13 +514,19 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- PDF 渲染中 / 完成 -->
-      <div v-else class="canvas-wrap">
+      <div v-else ref="scrollContainer" class="canvas-wrap" @scroll="handleScroll">
         <p v-if="pdfLoading" class="loading-tip" role="status">
-          {{ pageCount ? `正在渲染 ${renderedPages} / ${pageCount} 页…` : '正在加载文档…' }}
+          {{
+            zooming
+              ? '正在调整缩放…'
+              : pageCount
+                ? `正在渲染 ${renderedPages} / ${pageCount} 页…`
+                : '正在加载文档…'
+          }}
         </p>
 
-        <div class="page-list">
-          <div v-for="n in pageCount" :key="n" class="page">
+        <div class="page-list" :class="{ 'zoom-overflow': zoomedIn }">
+          <div v-for="n in pageCount" :key="n" :ref="(el) => setPageEl(n, el)" class="page">
             <canvas
               :ref="(el) => setCanvasEl(n, el)"
               class="pdf-canvas"
@@ -503,7 +734,93 @@ onBeforeUnmount(() => {
   opacity: 1;
 }
 
-/* ===== 共用状态卡片 ===== */
+/* ===== #6 翻页 / 缩放 ===== */
+.reader-bar {
+  flex-wrap: wrap;
+}
+
+.pdf-toolbar,
+.zoom-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tool-btn {
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
+  color: #334155;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.tool-btn:hover:not(:disabled) {
+  border-color: #93b4f5;
+  color: #2563eb;
+}
+
+.tool-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.page-input {
+  width: 52px;
+  height: 30px;
+  padding: 0 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 13px;
+  text-align: center;
+  outline: none;
+}
+
+.page-input:focus {
+  border-color: #2563eb;
+}
+
+/* 去掉 number 输入框的上下箭头，省出宽度 */
+.page-input::-webkit-outer-spin-button,
+.page-input::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.page-total,
+.zoom-value {
+  color: #64748b;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.zoom-value {
+  min-width: 42px;
+  text-align: center;
+}
+
+/* 放大超出面板宽度时允许横向滚动；默认仍按宽度自适应 */
+.canvas-wrap {
+  overflow: auto;
+}
+
+.page-list.zoom-overflow {
+  width: max-content;
+  min-width: 100%;
+}
+
+.page-list.zoom-overflow .pdf-canvas {
+  max-width: none;
+}
+
+/*共用状态卡片 */
 .state-card {
   flex: 1;
   display: flex;
@@ -551,7 +868,7 @@ onBeforeUnmount(() => {
   cursor: not-allowed;
 }
 
-/* ===== 右侧 Q&A 侧栏 ===== */
+/*右侧 Q&A 侧栏*/
 .qa-sidebar {
   width: 400px;
   min-width: 320px;
