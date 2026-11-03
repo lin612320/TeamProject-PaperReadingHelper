@@ -1,0 +1,20 @@
+﻿PaperMind Alpha · 第 8 天站会（2026-11-03）签入记录
+统计口径：上一份例会记录提交 1ab185f 之后至 HEAD
+仓库：lin612320/TeamProject-PaperReadingHelper   分支：master
+导出时间：2026-11-03 20:39:51
+提交数：14
+
+268d296 | 11-03 20:20 | 林子航 | docs: 新增构建门禁与已踩过的坑（style 块 // 注释致白屏、禁 force push、博客图片相对路径）(#3)
+70b5521 | 11-03 20:18 | 林子航 | docs: 第 6 周博客正文与交付 PDF 入库（已发助教，图片内嵌 6 张）(#26)
+0f13df7 | 11-03 20:12 | 林子航 | docs: 新增端到端走查手册（六步判据、判定表、断点登记与降级规则）(#4)
+aba888a | 11-03 20:08 | 林子航 | docs: 记录 D7/D8 燃尽数据（15/15、13/13，连续压线）并生成 D8 燃尽图 (#3)
+e062af4 | 11-03 19:46 | Linyuue | fix: 解析超时恢复契约值 25s (#13)
+bcd90cf | 11-03 19:43 | Linyuue | fix: 解析调用强制 HTTP/1.1、超时可配置；非法 JSON 返回 1001 (#13)
+5d768f1 | 11-03 18:12 | Li Yipeng | test: 冒烟回归 新增12条全通过；Bug 复测 6 条通过(#24 #25)
+0175fea | 11-03 18:07 | Cheongfan | chore: 内联论文接口的结构简化 (#18)
+42b42f0 | 11-03 18:05 | Cheongfan | fix: Embedding 模型并发加载加锁与进度条分支 (#19)
+39e56a8 | 11-03 17:13 | 杨靖 | fix: 修正 ReaderView 样式块中非法的 // 注释 (#6)
+d913914 | 11-03 16:00 | 杨靖 | Merge branch 'master' of ssh://ssh.github.com:443/lin612320/TeamProject-PaperReadingHelper
+7f805d4 | 11-03 15:46 | 杨靖 | feat: PDF 阅读器翻页与缩放 (#6)
+b3d7851 | 11-03 10:43 | Linyuue | fix: 不存在文献返回 2001、AI 服务错误码区分、mock/force 配置化、解析线程池；feat: 补 POST /api/qa/ask 转发 (#13 #14 #15)
+ceb5cd2 | 11-03 10:11 | Linyuue | fix:数据源改为环境变量注入，补齐文件换行（#22）
