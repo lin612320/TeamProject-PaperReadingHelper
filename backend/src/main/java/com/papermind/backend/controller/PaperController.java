@@ -79,9 +79,14 @@ public class PaperController {
     @GetMapping("/{paperId}/file")
     public ResponseEntity<byte[]> file(@PathVariable Long paperId) {
 
-        String filePath = jdbcTemplate.queryForObject(
-            "SELECT file_path FROM papers WHERE id = ? AND user_id = 1",
-            String.class, paperId);
+        String filePath;
+        try {
+            filePath = jdbcTemplate.queryForObject(
+                "SELECT file_path FROM papers WHERE id = ? AND user_id = 1",
+                String.class, paperId);
+        } catch (EmptyResultDataAccessException e) {
+            throw new BizException(ErrorCode.PAPER_NOT_FOUND);
+        }
 
         File pdf = new File(filePath);
         if (!pdf.exists()) {
@@ -104,9 +109,14 @@ public class PaperController {
     @DeleteMapping("/{paperId}")
     public ApiResponse<Void> delete(@PathVariable Long paperId) {
 
-        String filePath = jdbcTemplate.queryForObject(
-            "SELECT file_path FROM papers WHERE id = ? AND user_id = 1",
-            String.class, paperId);
+        String filePath;
+        try {
+            filePath = jdbcTemplate.queryForObject(
+                "SELECT file_path FROM papers WHERE id = ? AND user_id = 1",
+                String.class, paperId);
+        } catch (EmptyResultDataAccessException e) {
+            throw new BizException(ErrorCode.PAPER_NOT_FOUND);
+        }
 
         jdbcTemplate.update("DELETE FROM papers WHERE id = ? AND user_id = 1", paperId);
 

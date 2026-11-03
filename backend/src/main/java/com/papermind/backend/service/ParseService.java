@@ -23,6 +23,10 @@ public class ParseService {
     @Value("${app.parse.mock:true}")
     private boolean mock;
 
+    /** 是否强制重建已有切片（契约 force 字段），默认 false */
+    @Value("${app.parse.force:false}")
+    private boolean force;
+
     @Value("${app.ai-service.url:http://localhost:8000}")
     private String aiServiceUrl;
 
@@ -33,6 +37,8 @@ public class ParseService {
 
     @Async
     public void parseAsync(Long paperId, String filePath) {
+        log.info("parse start paperId={} mock={} thread={}",
+                paperId, mock, Thread.currentThread().getName());
         try {
             jdbcTemplate.update(
                 "UPDATE papers SET parse_status = 'parsing', parse_error = NULL WHERE id = ?", paperId);
@@ -48,7 +54,7 @@ public class ParseService {
                 Map<String, Object> req = new HashMap<>();
                 req.put("paperId", paperId);
                 req.put("filePath", filePath);
-                req.put("force", false);
+                req.put("force", force);
 
                 ResponseEntity<Map> resp = restTemplate.postForEntity(
                     aiServiceUrl + "/internal/papers/parse", req, Map.class);
