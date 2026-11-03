@@ -45,6 +45,15 @@ public class GlobalExceptionHandler {
             .body(ApiResponse.fail(ec.getCode(), ec.getMessage()));
     }
 
+    // 请求体不是合法 JSON / 类型不匹配
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBadBody(
+            org.springframework.http.converter.HttpMessageNotReadableException e) {
+        ErrorCode ec = ErrorCode.INVALID_PARAM;
+        return ResponseEntity.status(ec.getHttpStatus())
+            .body(ApiResponse.fail(ec.getCode(), ec.getMessage()));
+    }
+
     // 数据库异常，前面怀疑过的「5000 分不清是库挂了还是后端挂了」
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<ApiResponse<Void>> handleDb(DataAccessException e) {
