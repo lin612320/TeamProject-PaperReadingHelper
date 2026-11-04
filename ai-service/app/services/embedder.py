@@ -9,13 +9,21 @@ MODEL_NAME = "BAAI/bge-m3"
 _model = None   # 全局缓存，只加载一次
 _lock = threading.Lock()
 
+def _load_model():
+    """优先用本地缓存，避免每次加载都联网核对（国内直连会卡 5-10 分钟）。"""
+    try:
+        return SentenceTransformer(MODEL_NAME, local_files_only=True)
+    except Exception:
+        # 本地没有完整缓存（首次使用）：联网下载
+        return SentenceTransformer(MODEL_NAME)
+
 def get_model():
     """第一次调用时才加载模型（懒加载，并发时只加载一次）。"""
     global _model
     if _model is None:
         with _lock:
             if _model is None:
-                _model = SentenceTransformer(MODEL_NAME)
+                _model = _load_model()
     return _model
 
 def embed_texts(texts, show_progress_bar=True):
