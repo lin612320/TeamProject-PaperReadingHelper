@@ -54,6 +54,14 @@ public class GlobalExceptionHandler {
             .body(ApiResponse.fail(ec.getCode(), ec.getMessage()));
     }
 
+    // 路径不存在（没有匹配的 Controller）
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoRoute(
+            org.springframework.web.servlet.resource.NoResourceFoundException e) {
+        return ResponseEntity.status(404)
+            .body(ApiResponse.fail(ErrorCode.INVALID_PARAM.getCode(), "接口不存在"));
+    }
+
     // 数据库异常，前面怀疑过的「5000 分不清是库挂了还是后端挂了」
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<ApiResponse<Void>> handleDb(DataAccessException e) {
