@@ -4,7 +4,7 @@ import psycopg
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from app.routers import paper
+from app.routers import paper, qa
 
 load_dotenv()
 
@@ -18,6 +18,7 @@ VECTOR_DIM = int(os.getenv("VECTOR_DIM", "1024"))
 
 app = FastAPI(title="PaperMind AI Service")
 app.include_router(paper.router)
+app.include_router(qa.router)
 
 def check_db():
     conn = None
