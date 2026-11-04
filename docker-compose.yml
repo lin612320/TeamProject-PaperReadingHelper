@@ -1,15 +1,20 @@
 # PaperMind 本地依赖编排
 #
-# 当前可用：postgres(pgvector) + redis
-# 应用服务（frontend / backend / ai-service）待各自 Dockerfile 就绪后启用，
-# 目标：一条 `docker compose up` 起全栈（Issue #2，负责人 P1）
+# 全栈：postgres(pgvector) + redis + backend + ai-service + frontend
+# 一条 `docker compose up` 起全栈（Issue #2）
 #
 # 用法：
-#   docker compose up -d
-#   docker compose ps
-#   docker compose logs -f postgres
-#   docker compose down          # 保留数据卷
-#   docker compose down -v       # 连数据一起删
+#   docker compose up -d           # 后台起全栈
+#   docker compose up -d --build   # 改代码后重新构建镜像再起
+#   docker compose ps              # 看每个服务是否 healthy
+#   docker compose logs -f 服务名   # 看某个服务的实时日志
+#   docker compose down            # 停掉，保留数据卷
+#   docker compose down -v         # 停掉并连数据一起删
+#
+# 注意：
+#   - 首次 `docker compose up` 要拉取/构建镜像：ai-service 的 torch 镜像约 2GB+，
+#     frontend/node、backend/maven 镜像也不小，请留出时间耐心等待。
+#   - 前端对外端口是 8081（不是本地 dev 的 5173）。
 
 services:
   postgres:
@@ -47,46 +52,49 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # ------------------------------------------------------------------
-  # TODO(P1/#2)：以下三个服务待 Dockerfile 就绪后取消注释
-  # ------------------------------------------------------------------
-  # backend:
-  #   build: ./backend
-  #   container_name: papermind-backend
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
-  #   environment:
-  #     SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/papermind
-  #     SPRING_DATASOURCE_USERNAME: papermind
-  #     SPRING_DATASOURCE_PASSWORD: papermind_dev
-  #     REDIS_HOST: redis
-  #     REDIS_PORT: 6379
-  #     AI_SERVICE_URL: http://ai-service:8000
-  #   ports:
-  #     - "8080:8080"
-  #
-  # ai-service:
-  #   build: ./ai-service
-  #   container_name: papermind-ai
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #   environment:
-  #     DATABASE_URL: postgresql://papermind:papermind_dev@postgres:5432/papermind
-  #   ports:
-  #     - "8000:8000"
-  #
-  # frontend:
-  #   build: ./frontend
-  #   container_name: papermind-frontend
-  #   depends_on:
-  #     - backend
-  #   ports:
-  #     - "8081:80"
+  backend:
+    build: ./backend
+    container_name: papermind-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/papermind
+      SPRING_DATASOURCE_USERNAME: papermind
+      SPRING_DATASOURCE_PASSWORD: papermind_dev
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      AI_SERVICE_URL: http://ai-service:8000
+    ports:
+      - "8080:8080"
+    volumes:
+      - uploads:/app/uploads
+    restart: unless-stopped
+
+  ai-service:
+    build: ./ai-service
+    container_name: papermind-ai
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://papermind:papermind_dev@postgres:5432/papermind
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: papermind-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8081:80"
+    restart: unless-stopped
 
 volumes:
   pgdata:
   redis-data:
+  uploads:
