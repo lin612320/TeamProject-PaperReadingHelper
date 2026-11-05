@@ -23,22 +23,24 @@ PaperMind/
 ├─ frontend/             Vue 3 + PDF.js + Element Plus
 ├─ backend/              Spring Boot 业务服务
 ├─ ai-service/           FastAPI：PDF 解析 / 切片 / 检索 / 问答
-├─ docker-compose.yml    本地依赖编排（pgvector + Redis，应用服务待接入）
+├─ docker-compose.yml    一键起全栈（postgres + redis + backend + ai-service + frontend）
 └─ README.md
 ```
 
 ## 本地启动
 
 ```bash
-# 1. 起依赖（当前可用）
+# 1. 一条命令起全栈
 docker compose up -d
 
 # 2. 校验
 docker compose ps
-docker compose logs -f postgres
+docker compose logs -f backend
 ```
 
-> 应用服务（frontend / backend / ai-service）容器尚未接入，见 `docker-compose.yml` 内 TODO。待各自 Dockerfile 就绪后启用，目标是一条 `docker compose up` 起全栈（Issue #2）。
+> 一条 `docker compose up -d` 起全栈（postgres + redis + backend + ai-service + frontend）。首次会拉取/构建镜像（ai-service 的 torch 镜像约 2GB），耐心等待。
+>
+> 问答需要 DeepSeek Key：在仓库根目录执行 `cp ai-service/.env.example .env`，填好 `DEEPSEEK_API_KEY`，再 `docker compose up -d`（compose 会自动读取根目录 `.env`）。不填也能起，但提问会报「未配置 DEEPSEEK_API_KEY」。
 >
 > 改过 SQL 必须 `docker compose down -v` 才生效。
 
