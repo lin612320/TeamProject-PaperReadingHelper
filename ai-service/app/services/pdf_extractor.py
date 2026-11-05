@@ -3,6 +3,7 @@
 作用：FROM .pdf TO text_blocks
 """
 
+import re
 import pymupdf
 
 def extract_blocks(pdf_path):
@@ -18,7 +19,6 @@ def extract_blocks(pdf_path):
     blocks = []
     # 以 PyMuPDF 的方式打开.pdf文件
     with pymupdf.open(pdf_path) as pdf:
-        # PyMuPDF 能打开多种格式（如文本、Markdown），这里只接受真正的 PDF
         if not pdf.is_pdf:
             raise ValueError("不是 PDF 文件: " + str(pdf_path))
 
@@ -39,6 +39,8 @@ def extract_blocks(pdf_path):
                 if block_type != 0:
                     continue
 
+                # 去掉 NUL 等控制字符：PostgreSQL 的 text 字段不接受 0x00
+                text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text)
                 text = text.strip() # 删去开头结尾的空白字符
                 if text == "":
                     continue
