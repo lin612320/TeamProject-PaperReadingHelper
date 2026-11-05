@@ -68,6 +68,35 @@ cp .env.example .env
 - 修改 `.env` 后**必须重启服务**才生效（`load_dotenv()` 只在进程启动时读一次）。
 - `EMBEDDING_MODEL` / `VECTOR_DIM` 仅用于健康检查展示；实际向量模型固定为 `BAAI/bge-m3`（1024 维），改这两个变量不会切换模型。
 
+### 4.1 前端API KEY传输与安全风险
+
+`POST /internal/qa/ask` 提供接受三个可选字段覆盖了 `.env`的作用：
+
+| 字段 | 说明 |
+|---|---|
+| `apiKey` | 本次请求使用的 API Key |
+| `baseUrl` | 本次请求使用的 OpenAI 兼容接口地址 |
+| `model` | 本次请求使用的模型名 |
+
+当三个字段都不传时，行为与原来完全一致。
+
+安全约束：
+
+- `baseUrl` 只接受 `http://` / `https://` 完整地址；
+- 传了 `baseUrl` 但没传 `apiKey` 时直接拒绝，避免把服务端 `.env` 的 Key 发往用户指定地址；
+- API Key 不写日志、不回传、不入库。
+
+#### 风险提示
+
+- 浏览器到后端、后端到 ai-service 不能走明文 HTTP，因为Key 可能被同网段或代理抓包；
+- 前端把API Key 存于 localStorage，会导致XSS、恶意扩展或共享设备能随意读取；
+- 网关、APM、日志组件若记录请求体，可能导致API Key被记录；
+- `baseUrl` 由请求方控制，存在 SSRF 面；`urllib` 默认跟随 3xx 重定向，`Authorization` 有被带到重定向目标的风险；
+- 上游服务若在错误响应中反射 `Authorization`，错误信息或日志可能带出API Key（当前 `llm_client` 会把上游 body 前 300 字放进错误）；
+- 多用户/共享部署时，不要把服务端 `.env` 的 Key 兜底给匿名请求。
+
+部署前建议：全链路 HTTPS；`baseUrl` 域名白名单并禁止重定向；日志/APM 关闭请求体捕获；对上游错误体脱敏；限制 `baseUrl` 访问私网与云元数据地址。
+
 ### 5. 启动并验证（ai-service 目录）
 
 ```bash
