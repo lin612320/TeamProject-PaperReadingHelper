@@ -9,11 +9,11 @@
 | **BUG-003** | `8ecb98c` | `POST /api/papers` 响应缺 `pageCount`、`createdAt`，多 `size`、`path`（列表接口 `GET /api/papers` 字段正确，仅上传接口不符） | 上传任意 PDF 后看响应体，对照契约 `PaperDetail` | 前端按契约取值会拿到 `undefined` | S1 | P4 | 已修复 |
 | **BUG-004** | `8ecb98c` | 把 docx 改名成 `.pdf` 后上传成功入库（`id=2`），未被识别 | `curl -X POST /api/papers -F "file=@fake.pdf"` 返回 `code=0` | 脏数据入库；该文件必然解析失败，用户看不到原因 | S1 | P4 | 已修复 |
 | **BUG-005** | `8ecb98c` | 上传 51MB PDF 返回 `5000 服务器内部错误`，而非契约规定的 `1003 文件超过 50MB` | `curl -i -X POST /api/papers -F "file=@big.pdf"`。对照：同内容的 48MB 文件返回 `code=0`，证明与文件内容无关，只取决于大小 | 无法区分“文件太大”和“服务崩了”，用户不知道该改什么 | S2 | P4 | 已修复 |
-| **BUG-006** | `8ecb98c` | 解析完成后 `pageCount` 恒为 15、`chunkCount` 恒为 128，与文件无关 | 上传 10 页的 `demo-10p.pdf`，4 秒后 `GET /api/papers/4`，返回 `pageCount:15`、`chunkCount:128` | 列表页数全部错误；F1「10 页 PDF」验收无法证明；切片数失真 | S1 | P4 | 待修复 |
+| **BUG-006** | `8ecb98c` | 解析完成后 `pageCount` 恒为 15、`chunkCount` 恒为 128，与文件无关 | 上传 10 页的 `demo-10p.pdf`，4 秒后 `GET /api/papers/4`，返回 `pageCount:15`、`chunkCount:128` | 列表页数全部错误；F1「10 页 PDF」验收无法证明；切片数失真 | S1 | P4 | 已修复 |
 | **BUG-007** | `8ecb98c` | 无访问日志：发请求后控制台只有启动日志和首次请求的懒加载初始化，没有路径、文件名、状态码 | 启动后上传任意 PDF，翻控制台日志，找不到这次请求的任何记录 | 出问题无法定位是哪个请求、哪个文件、什么错误；#23「运行日志可查」不达标 | S1 | P4 | 已修复 |
-| **BUG-008** | `7d39ee8` | 解析失败时 `parseError` 只有 `unknown error`，看不出是连不上 AI 还是超时 | 停掉 AI 服务（8000 无监听）后上传任意 PDF，`GET /api/papers/{id}` → `parseError:"unknown error"` | 用户与测试无法定位故障；`#13` 的失败路径不可观测 | S1 | P4 | 待修复 |
-| **BUG-009** | `7d39ee8` | 后缀为 `.docx`、内容却是合法 PDF 的文件被接口接受并入库（HTTP 200，`id=6`） | `curl -F "file=@not-a-pdf.docx" /api/papers` → 200 | 前端按后缀拦、接口按内容放行，两层不一致；与 F1-02 判据「`.docx` 应被拒」冲突，需先定口径 | S2 | P4 + P7 | 待修复 |
-| **BUG-010** | `7d39ee8` | 上传后解析必然失败：实测 **65.6 秒**后 `parseStatus=failed`、`parseError=request timed out`、`chunkCount=0`，文献不可提问 | 上传 20 页中文论文（1.88 MB），轮询 `GET /api/papers/{id}` 直至 `failed` | 同一文件 AI 直连解析需 **60 秒以上**（65 片），后端上限 **25 秒**（`ParseService.java:64`）→ 必然超时；F1-10 与 F3 正例全部不可测 | S0 | P4 | 待修复 |
+| **BUG-008** | `7d39ee8` | 解析失败时 `parseError` 只有 `unknown error`，看不出是连不上 AI 还是超时 | 停掉 AI 服务（8000 无监听）后上传任意 PDF，`GET /api/papers/{id}` → `parseError:"unknown error"` | 用户与测试无法定位故障；`#13` 的失败路径不可观测 | S1 | P4 | 已修复 |
+| **BUG-009** | `7d39ee8` | 后缀为 `.docx`、内容却是合法 PDF 的文件被接口接受并入库（HTTP 200，`id=6`） | `curl -F "file=@not-a-pdf.docx" /api/papers` → 200 | 前端按后缀拦、接口按内容放行，两层不一致；与 F1-02 判据「`.docx` 应被拒」冲突，需先定口径 | S2 | P4 + P7 | 已修复 |
+| **BUG-010** | `7d39ee8` | 上传后解析必然失败：实测 **65.6 秒**后 `parseStatus=failed`、`parseError=request timed out`、`chunkCount=0`，文献不可提问 | 上传 20 页中文论文（1.88 MB），轮询 `GET /api/papers/{id}` 直至 `failed` | 同一文件 AI 直连解析需 **60 秒以上**（65 片），后端上限 **25 秒**（`ParseService.java:64`）→ 必然超时；F1-10 与 F3 正例全部不可测 | S0 | P4 | 已修复 |
 
 级别：**S0** 主链断（演示走不通）· **S1** 验收不达标 · **S2** 体验或契约一致性
 （S = Severity 严重程度，与分工编号 P1–P7 区分；归属列的 P3/P4 才是人）
