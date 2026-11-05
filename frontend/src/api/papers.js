@@ -126,9 +126,17 @@ export function uploadPaper(file, onProgress) {
 }
 
 // 针对单篇论文提问（25 秒超时，超过则中止并抛错）
-export async function askQuestion(paperId, question) {
+// aiConfig 可选，包含用户在设置页配置的 apiKey/baseUrl/model
+export async function askQuestion(paperId, question, aiConfig = null) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 25000)
+
+  const payload = { paperId, question }
+  if (aiConfig) {
+    payload.apiKey = aiConfig.apiKey
+    payload.baseUrl = aiConfig.baseUrl
+    payload.model = aiConfig.model
+  }
 
   let response
   let result
@@ -136,7 +144,7 @@ export async function askQuestion(paperId, question) {
     response = await fetch(`${API_BASE}/api/qa/ask`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paperId, question }),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     })
 

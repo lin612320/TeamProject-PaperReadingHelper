@@ -2,22 +2,23 @@
 import { ref, computed, nextTick, onMounted, onBeforeUnmount, shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { getPaper, askQuestion } from '../api/papers'
+import { useSettings } from '../composables/useSettings'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
 const route = useRoute()
+const { settings, isConfigured } = useSettings()
 const paperId = Number(route.params.paperId)
 
 
 const PDF_API_BASE = import.meta.env.VITE_API_BASE || ''
 const FALLBACK_SAMPLE = '/sample.pdf'
 
-// 将 pdf.js 抛出的技术错误转换为人话
 function formatPdfError(error) {
   const msg = error?.message || ''
-  // 已经是中文人话（如开发提示），直接返回
+
   if (/[\u4e00-\u9fa5]/.test(msg)) return msg
   if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('server response')) {
     return '无法连接到服务器，请检查网络或后端服务是否启动'
@@ -48,7 +49,7 @@ let renderTasks = []
 const ZOOM_MIN = 0.6
 const ZOOM_MAX = 2.4
 const ZOOM_STEP = 0.2
-const BASE_SCALE = 1.4 // 自适应宽度时的基准倍率，超过它才允许横向滚动
+const BASE_SCALE = 1.4 // 自适应宽度时的基准倍率
 
 const scrollContainer = ref(null)
 const pageEls = new Map()
@@ -161,7 +162,7 @@ function pageOffsetTop(el, container) {
   return el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
 }
 
-// 取「视口上部 30% 处」所在页作为当前页 
+// 取视口上部 30% 处所在页作为当前页 
 function updateCurrentPage() {
   const container = scrollContainer.value
   const total = pageCount.value
@@ -188,7 +189,7 @@ function handleScroll() {
   })
 }
 
-// 滚动到指定页（页码会被夹到 1..pageCount） 
+// 滚动到指定页，页码会被夹到 1..pageCount
 function goToPage(target, smooth = true) {
   const container = scrollContainer.value
   const total = pageCount.value
@@ -206,7 +207,7 @@ function goToPage(target, smooth = true) {
   })
 }
 
-// 页码输入框：回车 / 失焦时跳转，非法值回退 
+// 页码输入框：回车、失焦时跳转，非法值回退 
 function commitPageInput() {
   editingPage.value = false
   const target = Number(pageInput.value)
@@ -349,7 +350,8 @@ async function handleSend() {
   scrollToBottom()
 
   try {
-    const data = await askQuestion(paperId, q)
+    const aiConfig = isConfigured() ? settings.value : null
+    const data = await askQuestion(paperId, q, aiConfig)
     const idx = chatItems.value.findIndex((item) => item.id === aId)
     if (idx !== -1) {
       chatItems.value[idx] = {
@@ -393,7 +395,8 @@ async function handleRetry(questionText) {
   scrollToBottom()
 
   try {
-    const data = await askQuestion(paperId, questionText)
+    const aiConfig = isConfigured() ? settings.value : null
+    const data = await askQuestion(paperId, questionText, aiConfig)
     const idx = chatItems.value.findIndex((item) => item.id === aId)
     if (idx !== -1) {
       chatItems.value[idx] = {
@@ -640,6 +643,11 @@ onBeforeUnmount(() => {
 
       <div v-else class="qa-empty">
         <p>在下方输入问题，开始向 AI 提问这篇论文。</p>
+      </div>
+
+      <div v-if="!isConfigured()" class="qa-config-notice">
+        <span>尚未配置 API Key，</span>
+        <RouterLink to="/settings">前往设置</RouterLink>
       </div>
 
       <div class="qa-input-area">
@@ -1103,6 +1111,26 @@ onBeforeUnmount(() => {
   text-align: center;
   color: #94a3b8;
   font-size: 14px;
+}
+
+/* 未配置 API Key 提示 */
+.qa-config-notice {
+  padding: 8px 16px;
+  background: #fffbeb;
+  border-top: 1px solid #fde68a;
+  color: #92400e;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.qa-config-notice a {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.qa-config-notice a:hover {
+  text-decoration: underline;
 }
 
 /* 输入区域 */

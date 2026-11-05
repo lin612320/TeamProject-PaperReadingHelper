@@ -6,6 +6,7 @@
       <div class="nav-links">
         <RouterLink to="/">上传文献</RouterLink>
         <RouterLink to="/library">我的文献</RouterLink>
+        <RouterLink to="/settings">设置</RouterLink>
       </div>
     </nav>
 
