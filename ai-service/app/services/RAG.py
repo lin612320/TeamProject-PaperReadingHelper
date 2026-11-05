@@ -131,7 +131,8 @@ def answer_question(paper_id, question, top_k=3, max_citations=3):
 
     remaining = MAX_TOTAL_SECONDS - (time.time() - start)
     if remaining <= 1:
-        raise QaError("LLM_TIMEOUT", "问答总耗时超过 25 秒")
+        # 错误码受 frozen 契约约束仍用 LLM_TIMEOUT，但文案要说明慢在检索
+        raise QaError("LLM_TIMEOUT", "检索阶段耗时超过预算")
 
     messages = build_prompt(question, chunks)
     try:
