@@ -138,8 +138,15 @@ public class PaperController {
             throw new BizException(ErrorCode.INVALID_PARAM);
         }
 
+        // 校验一（BUG-009）：后缀必须是 .pdf，与前端的判据保持一致
         String originalName = file.getOriginalFilename();
         if (originalName == null || !originalName.toLowerCase().endsWith(".pdf")) {
+            throw new BizException(ErrorCode.FILE_NOT_PDF);
+        }
+
+        // 校验二（BUG-004）：内容必须是 PDF——文件头 %PDF
+        // 只校验后缀不够：纯文本改名成 .pdf 会被放进来，造成脏数据入库
+        if (!isPdf(file)) {
             throw new BizException(ErrorCode.FILE_NOT_PDF);
         }
 
@@ -156,7 +163,7 @@ public class PaperController {
             throw new BizException(ErrorCode.STORAGE_ERROR);
         }
 
-        String title = (originalName != null && originalName.contains("."))
+        String title = (originalName.contains("."))
             ? originalName.substring(0, originalName.lastIndexOf('.'))
             : originalName;
 
