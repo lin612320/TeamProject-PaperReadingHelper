@@ -2,7 +2,7 @@
 # PaperMind · 内部服务契约（Spring Boot ↔ FastAPI）
 # ============================================================================
 # 谁和谁的约定：P4 刘万礼（Spring Boot，调用方） ↔ P5 吴啸天（FastAPI，被调用方）
-# 版本：1.0.0-frozen   冻结日期：2026-10-24（P1 裁定提前冻结）
+# 版本：1.0.1-frozen   冻结日期：2026-10-24 · 1.0.1 修订：2026-11-05（P1）
 #
 # 【它管什么】
 #   浏览器看不到这条链路。它只管「后端怎么让 AI 服务干活、AI 服务怎么把结果交回来」。
@@ -16,14 +16,17 @@
 # 【三个约定】
 #   1. 页码 page 一律从 1 开始（1-based）
 #   2. bbox 归一化 0~1，相对单页宽高，左上原点；Alpha 阶段一律返回 null
-#   3. P4 调用 P5 的超时上限 25 秒；超过就是 P5 的问题，P4 立即返回 3002
+#   3. P4 调用 P5 的超时分两个接口，别混：
+#        · /internal/papers/parse（解析）——180 秒。实测 CPU 上 bge-m3 约 0.7 秒/切片，
+#          20 页约 60 秒，大论文可到 3 分钟。原来统一写 25 秒是错的，必然超时。
+#        · /internal/qa/ask（问答）——25 秒，超了 P4 返回 3002。
 # ============================================================================
 
 openapi: 3.0.3
 
 info:
   title: PaperMind Internal API (Spring Boot ↔ FastAPI)
-  version: 1.0.0-frozen
+  version: 1.0.1-frozen
   description: |
     内部服务契约。P5 在 FastAPI 里实现下面 4 个接口，P4 在 Spring Boot 里调用。
 
@@ -106,7 +109,11 @@ paths:
       operationId: internalParsePaper
       summary: 解析 PDF 并生成段落向量
       description: |
-        **这是耗时接口（10~60 秒，取决于页数与模型速度），P4 必须异步调用。**
+        **这是耗时接口（实测 60~180 秒，取决于页数与模型速度），P4 必须异步调用。**
+
+        **超时约定（1.0.1 修订）**：P4 调本接口的等待上限 **180 秒**，不要沿用问答接口的 25 秒。
+        实测数据：CPU 上 bge-m3 约 0.7 秒/切片；20 页论文约 65 片、耗时 60 秒以上；
+        50 页上限内的论文可达 3 分钟。P4 侧配置项 `app.parse.timeout-seconds`，默认 180。
 
         推荐流程（P4 侧）：
           1. 用户上传 → P4 存文件进 papers 表，parse_status='pending' → 立即返回 200 给浏览器
@@ -414,13 +421,13 @@ components:
 x-acceptance:
   P5_提供方:
     - GET  /internal/health 返回 dbReady 与 vectorDim
-    - POST /internal/papers/parse 能对一篇 15 页 PDF 生成 chunks，耗时 < 60s
+    - POST /internal/papers/parse 能对一篇 20 页 PDF 生成 chunks，耗时 < 180s（1.0.1 修订，原 < 60s）
     - POST /internal/qa/ask 能对「方法核心是什么」返回答案 + 页码引用
     - 论文里没有的内容，返回「本文未涉及该内容」而不是编造
     - 所有 citation 的 page 从 1 开始，bbox 全为 null
     - tokenUsage 三个数字都有值
   P4_调用方:
     - 上传后立即返回，解析走后台线程，parse_status 按 pending→parsing→ready 流转
-    - 调 P5 设 25 秒超时，超时返回对外错误码 3002
+    - 调 P5 超时分开设：解析 180 秒、问答 25 秒；问答超时返回对外 3002
     - 把 P5 的 InternalError.code 正确映射成对外 code（见 InternalError 枚举注释）
     - 删除文献时先调 DELETE 再删 papers
