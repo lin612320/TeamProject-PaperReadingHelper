@@ -1,0 +1,572 @@
+{
+  "baseUrl": "http://127.0.0.1:8000",
+  "gitCommit": "3c742d6",
+  "label": "3papers",
+  "papers": {
+    "A": {
+      "title": "Adaptive-RAG: Learning to Adapt Retrieval-Augmented Large Language Models through Question Complexity",
+      "source": "arXiv 2403.14403v2（NAACL 2024）",
+      "path": "ai-service/data/baseline/adaptive-rag/adaptive-rag.pdf",
+      "sha256": "12d262c682626c26a98bdafc7ec5dc6af3fae8247d26d4f2c712b1599dafce62",
+      "paperId": 37,
+      "chunkCount": 135
+    },
+    "B": {
+      "title": "Query Rewriting for Retrieval-Augmented Large Language Models",
+      "source": "arXiv 2305.14283v3（EMNLP 2023）",
+      "path": "ai-service/data/baseline/query-rewriting/query-rewriting.pdf",
+      "sha256": "483472d9ccc633fe649a87f2224a09c717fcfe052c2914c50f8abce5f34dca84",
+      "paperId": 38,
+      "chunkCount": 101
+    },
+    "C": {
+      "title": "DETRs Beat YOLOs on Real-time Object Detection",
+      "source": "arXiv 2304.08069v3（CVPR 2024）",
+      "path": "ai-service/data/baseline/rt-detr/rt-detr.pdf",
+      "sha256": "01018b33f15723f057b1b65c4ae6958e8cc99b75acf1ca434467c9f5f0782f15",
+      "paperId": 39,
+      "chunkCount": 105
+    }
+  },
+  "date": "2026-11-05",
+  "autoHits": 9,
+  "total": 10,
+  "negativePassed": 3,
+  "negativeTotal": 3,
+  "note": "autoHit 不含「答案是否编造」；该列与最终命中需人工确认。",
+  "results": [
+    {
+      "id": "A1",
+      "difficulty": "方法",
+      "paper": "A",
+      "question": "分类器的三个复杂度标签 A、B、C 分别代表什么？",
+      "standardPages": [
+        5
+      ],
+      "status": 200,
+      "answer": "A：q 简单直接，LLM(q) 本身即可回答；B：q 具有中等复杂度，至少需要单步方法 LLM(q, d)；C：q 复杂，需要最广泛的解决方案 LLM(q, d, c)。",
+      "returnedPages": [
+        5,
+        8,
+        5
+      ],
+      "pageHit": true,
+      "snippetMatch": true,
+      "answered": true,
+      "autoHit": true,
+      "manualFabricated": false,
+      "manualHit": true,
+      "elapsedMs": 1250,
+      "citations": [
+        {
+          "page": 5,
+          "snippet": "ier design, there are three class labels: ‘A’,\n‘B’, and ‘C’, where ‘A’ indicates that q is straight-\n\nforward and answerable by LLM(q) itself, ‘B’ in-\ndicates that q has the moderate complexity where\n",
+          "chunkId": 2073,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 8,
+          "snippet": "times. In addition to the true positive performance\nof our classifier averaged over all those three\n\n la-\nbels in Figure 3 (Left and Center), we further re-\nport its confusion matrix in Figure 3 (Righ",
+          "chunkId": 2101,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 5,
+          "snippet": "ferent\ncomplexities, without changing the internal model\narchitecture or parameters during adaption.\n\nQuery Complexity Assessment\nTo operational-\nize our adaptive retrieval-augmented LLM frame-\nwork, ",
+          "chunkId": 2072,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        }
+      ],
+      "manualNote": ""
+    },
+    {
+      "id": "A2",
+      "difficulty": "方法",
+      "paper": "A",
+      "question": "分类器的训练标签是如何自动构造的？",
+      "standardPages": [
+        5
+      ],
+      "status": 200,
+      "answer": "原文提到自动构造训练数据集有两种策略，但片段中仅具体描述了其中一步：对第一步标注后仍未标注的查询，单跳数据集中的查询赋为‘B’，多跳数据集中的查询赋为‘C’。另一种策略的具体做法本文未涉及。",
+      "returnedPages": [
+        5,
+        8,
+        5
+      ],
+      "pageHit": true,
+      "snippetMatch": true,
+      "answered": true,
+      "autoHit": true,
+      "manualFabricated": false,
+      "manualHit": true,
+      "elapsedMs": 1606,
+      "citations": [
+        {
+          "page": 5,
+          "snippet": "ier design, there are three class labels: ‘A’,\n‘B’, and ‘C’, where ‘A’ indicates that q is straight-\n\nforward and answerable by LLM(q) itself, ‘B’ in-\ndicates that q has the moderate complexity where\n",
+          "chunkId": 2073,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 8,
+          "snippet": "Labels\nTime/Query (Sec.)\nPercentage (%)\n\nNo (A)\n0.35\n8.60\nOne (B)\n3.08\n53.33\nMulti (C)\n27.18\n38.07\n\nClassifier Performance\nTo understand how the\nproposed classifier works, we analyze its perfor-\nmance",
+          "chunkId": 2100,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 5,
+          "snippet": "tep approach). Therefore, for those queries\nthat remain unlabeled after the first labeling step,\nwe \n\nassign ‘B’ to queries in single-hop datasets\nand ‘C’ to queries in multi-hop datasets. Finally,\nwe",
+          "chunkId": 2077,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        }
+      ],
+      "manualNote": "答案不完整：未展开 silver 标签策略，并误称另一策略未涉及；无编造"
+    },
+    {
+      "id": "A3",
+      "difficulty": "结论",
+      "paper": "A",
+      "question": "与多步（multi-step）方法相比，论文如何描述 Adaptive-RAG 的效率？",
+      "standardPages": [
+        7
+      ],
+      "status": 200,
+      "answer": "与复杂的多步（multi-step）策略相比，论文描述 Adaptive-RAG 提出的自适应策略在所有模型规模上都显著更高效（significantly more efficient across all model sizes）。",
+      "returnedPages": [
+        7,
+        7,
+        9
+      ],
+      "pageHit": true,
+      "snippetMatch": true,
+      "answered": true,
+      "autoHit": true,
+      "manualFabricated": false,
+      "manualHit": true,
+      "elapsedMs": 1520,
+      "citations": [
+        {
+          "page": 7,
+          "snippet": "also efficiency. As shown in Table 1, compared to\nthe complex multi-step strategy, our proposed ada\n\np-\ntive strategy is significantly more efficient across\nall model sizes. This is meaningful in this",
+          "chunkId": 2097,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 7,
+          "snippet": "for\nadaptive strategies. Note that among the adaptive\nstrategies, our Adaptive-RAG shows remarkable\n\neffectiveness over the competitors (Table 1). This\nindicates that merely focusing on the decision o",
+          "chunkId": 2096,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 9,
+          "snippet": "ated from the predicted outcomes and the inductive\nbiases in datasets. We validated our Adaptive-RAG\n\non a collection of open-domain QA datasets, cover-\ning the multiple query complexities including b",
+          "chunkId": 2114,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        }
+      ],
+      "manualNote": ""
+    },
+    {
+      "id": "A4",
+      "difficulty": "细节",
+      "paper": "A",
+      "question": "表 3 中，标签 A、B、C 对应的每查询精确耗时分别是多少？",
+      "standardPages": [
+        8
+      ],
+      "status": 200,
+      "answer": "标签 A 为 0.35 秒，标签 B 为 3.08 秒，标签 C 为 27.18 秒。",
+      "returnedPages": [
+        8,
+        8,
+        8
+      ],
+      "pageHit": true,
+      "snippetMatch": true,
+      "answered": true,
+      "autoHit": true,
+      "manualFabricated": false,
+      "manualHit": true,
+      "elapsedMs": 1041,
+      "citations": [
+        {
+          "page": 8,
+          "snippet": "Table 3: The exact elapsed time per query and the percentage\nof the predicted labels from the classifier over all samples.\n\nLabels\nTime/Query (Sec.)\nPercentage (%)\n\nNo (A)\n0.35\n8.60\nOne (B)\n3.08\n53.33",
+          "chunkId": 2099,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 8,
+          "snippet": "further refining it based\non such misclassification would be a meaningful\ndirection for future work.\n\nAnalyses on Efficiency for Classifier\nWhile Ta-\nble 1 shows the relative elapsed time for each of ",
+          "chunkId": 2102,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 8,
+          "snippet": "Labels\nTime/Query (Sec.)\nPercentage (%)\n\nNo (A)\n0.35\n8.60\nOne (B)\n3.08\n53.33\nMulti (C)\n27.18\n38.07\n\nClassifier Performance\nTo understand how the\nproposed classifier works, we analyze its perfor-\nmance",
+          "chunkId": 2100,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        }
+      ],
+      "manualNote": ""
+    },
+    {
+      "id": "B1",
+      "difficulty": "方法",
+      "paper": "B",
+      "question": "Rewrite-Retrieve-Read 框架包含哪三个步骤？",
+      "standardPages": [
+        4
+      ],
+      "status": 200,
+      "answer": "原文片段直接给出了答案：Rewrite-Retrieve-Read 框架包含三个步骤：(i) Query rewrite：基于原始输入 x 生成所需知识的查询 ˜x；(ii) Retrieve：搜索相关上下文 doc；(iii) Read：结合上下文 [doc, x] 理解输入并预测输出 ˆy。",
+      "returnedPages": [
+        4,
+        4,
+        9
+      ],
+      "pageHit": true,
+      "snippetMatch": true,
+      "answered": true,
+      "autoHit": true,
+      "manualFabricated": false,
+      "manualHit": true,
+      "elapsedMs": 1321,
+      "citations": [
+        {
+          "page": 4,
+          "snippet": "eline\nframework in section 3.1, then the trainable scheme\nin section 3.2.\n\n3.1\nRewrite-Retrieve-Read\n\nA task with retrieval augmentation can be de-\nnoted as follows. Given a dataset of a knowledge-\nin",
+          "chunkId": 2193,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 4,
+          "snippet": "constructing the search query.\n\n3\nMethodology\n\nWe present Rewrite-Retrieve-Read, a pipeline that\n\nimproves the retrieval-augmented LLM from the\nperspective of query rewriting. Figure 1 shows an\novervi",
+          "chunkId": 2192,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 9,
+          "snippet": "Introduction to Community\nPlanning where the answer environment appears\nseveral times.\n\n7\nConclusion\n\nThis paper introduces the Rewrite-Retrieve-Read\npipeline, where a query rewriting step is added\nfo",
+          "chunkId": 2231,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        }
+      ],
+      "manualNote": ""
+    },
+    {
+      "id": "B2",
+      "difficulty": "细节",
+      "paper": "B",
+      "question": "可训练的 rewriter 用什么模型初始化，参数量是多少？",
+      "standardPages": [
+        4
+      ],
+      "status": 200,
+      "answer": "可训练的 rewriter 用预训练的 T5-large（770M）初始化。",
+      "returnedPages": [
+        4,
+        12,
+        4
+      ],
+      "pageHit": true,
+      "snippetMatch": true,
+      "answered": true,
+      "autoHit": true,
+      "manualFabricated": false,
+      "manualHit": true,
+      "elapsedMs": 1258,
+      "citations": [
+        {
+          "page": 4,
+          "snippet": "it is\nfeasible to add a trainable model and adapt it by\ntaking the LLM reader feedback as a reward.\n\nBased on our framework, we further propose to\nutilize a trainable small language model to take\nover",
+          "chunkId": 2195,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 12,
+          "snippet": "tuning lan-\nguage models from human preferences.\narXiv\npreprint arXiv:1909.08593.\n\nA\nWarm-up Dataset\n\nFor the warm-up training of the tuneable rewriter,\nwe construct a pseudo dataset for the query rew",
+          "chunkId": 2260,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 4,
+          "snippet": "the pre-training objective of sequence-to-sequence\ngenerative models like T5. First, we construct a\n\npseudo dataset for the query rewriting task. In-\nspired by recent distillation methods (Hsieh et al",
+          "chunkId": 2196,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        }
+      ],
+      "manualNote": ""
+    },
+    {
+      "id": "B3",
+      "difficulty": "结论",
+      "paper": "B",
+      "question": "论文结论认为该工作的主要贡献是什么？",
+      "standardPages": [
+        9
+      ],
+      "status": 200,
+      "answer": "本文未涉及该内容",
+      "returnedPages": [],
+      "pageHit": false,
+      "snippetMatch": false,
+      "answered": false,
+      "autoHit": false,
+      "manualFabricated": false,
+      "manualHit": false,
+      "elapsedMs": 901,
+      "citations": [],
+      "manualNote": "模型返回「本文未涉及该内容」，未给出答案与引用"
+    },
+    {
+      "id": "C1",
+      "difficulty": "方法",
+      "paper": "C",
+      "question": "RT-DETR 的高效混合编码器由哪两个模块组成？",
+      "standardPages": [
+        4,
+        5
+      ],
+      "status": 200,
+      "answer": "高效混合编码器通过尺度内特征交互和跨尺度特征融合两个模块，将多尺度特征转换为图像特征序列。",
+      "returnedPages": [
+        1,
+        4,
+        11
+      ],
+      "pageHit": true,
+      "snippetMatch": true,
+      "answered": true,
+      "autoHit": true,
+      "manualFabricated": false,
+      "manualHit": true,
+      "elapsedMs": 1324,
+      "citations": [
+        {
+          "page": 1,
+          "snippet": "detector to our best knowledge\nthat addresses the above dilemma. We build RT-DETR in\ntwo steps, draw\n\ning on the advanced DETR: first we focus\non maintaining accuracy while improving speed, followed\nb",
+          "chunkId": 2270,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 4,
+          "snippet": "ee\ndetectors (three times more in our tested detectors).\n\n4. The Real-time DETR\n\n4.1. Model Overview\n\nRT-DETR consists of a backbone, an efficient hybrid en-\ncoder, and a Transformer decoder with auxi",
+          "chunkId": 2297,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 11,
+          "snippet": "block in\nCCFF consists of 3 RepBlocks. We leverage the uncertainty-\nminimal query selection to selec\n\nt top 300 encoder features\nto initialize object queries of the decoder. The training\nstrategy and ",
+          "chunkId": 2356,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        }
+      ],
+      "manualNote": "未给出 AIFI/CCFF 缩写，仅描述两个模块的功能；无编造"
+    },
+    {
+      "id": "C2",
+      "difficulty": "细节",
+      "paper": "C",
+      "question": "RT-DETR-R50 在 COCO 上达到多少 AP、多少 FPS（T4 GPU）？",
+      "standardPages": [
+        1,
+        2
+      ],
+      "status": 200,
+      "answer": "RT-DETR-R50 在 COCO val2017 上达到 53.1% AP，在 T4 GPU 上达到 108 FPS。",
+      "returnedPages": [
+        2,
+        1,
+        6
+      ],
+      "pageHit": true,
+      "snippetMatch": true,
+      "answered": true,
+      "autoHit": true,
+      "manualFabricated": false,
+      "manualHit": true,
+      "elapsedMs": 1318,
+      "citations": [
+        {
+          "page": 2,
+          "snippet": "ious real-time scenarios without retraining, thanks\nto the multi-layer decoder architecture of DETR.\n\nRT-DETR achieves an ideal trade-off between the speed\nand accuracy. Specifically, RT-DETR-R50 achi",
+          "chunkId": 2280,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 1,
+          "snippet": "retraining. Our RT-DETR-R50\n/ R101 achieves 53.1% / 54.3% AP on COCO and 108 / 74\nFPS on T4 GPU, out\n\nperforming previously advanced YOLOs\n\nin both speed and accuracy. Furthermore, RT-DETR-R50\noutperf",
+          "chunkId": 2271,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 6,
+          "snippet": "ted on T4 GPU with TensorRT FP16, and for\nYOLO detectors using official pre-trained models according\n\nto the end-to-end speed benchmark proposed in Sec. 3.2. Our\nRT-DETR-R50 achieves 53.1% AP and 108 ",
+          "chunkId": 2317,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        }
+      ],
+      "manualNote": ""
+    },
+    {
+      "id": "C3",
+      "difficulty": "结论",
+      "paper": "C",
+      "question": "论文结论把 RT-DETR 的两项关键改进归纳为什么？",
+      "standardPages": [
+        8
+      ],
+      "status": 200,
+      "answer": "论文结论把 RT-DETR 的两项关键改进归纳为：高效混合编码器（efficient hybrid encoder）和不确定性最小查询选择（uncertainty-minimal query selection）。",
+      "returnedPages": [
+        8,
+        6,
+        4
+      ],
+      "pageHit": true,
+      "snippetMatch": true,
+      "answered": true,
+      "autoHit": true,
+      "manualFabricated": false,
+      "manualHit": true,
+      "elapsedMs": 1051,
+      "citations": [
+        {
+          "page": 8,
+          "snippet": "her real-time detectors and could be an interesting\ndirection for future exploration.\n\n7. Conclusion\n\nIn this work, we propose a real-time end-to-end detector,\ncalled RT-DETR, which successfully exten",
+          "chunkId": 2334,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 6,
+          "snippet": "rameters by 11.6% / 22.4%. Compared to YOLOv7-L /\nYOLOv8-L, RT-DETR-R50 improves accuracy by 1.9% /\n\n0.2% AP and increases FPS by 96.4% / 52.1%. Compared\nto YOLOv7-X / YOLOv8-X, RT-DETR-R101 improves ",
+          "chunkId": 2319,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 4,
+          "snippet": "ee\ndetectors (three times more in our tested detectors).\n\n4. The Real-time DETR\n\n4.1. Model Overview\n\nRT-DETR consists of a backbone, an efficient hybrid en-\ncoder, and a Transformer decoder with auxi",
+          "chunkId": 2297,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        }
+      ],
+      "manualNote": ""
+    }
+  ],
+  "negatives": [
+    {
+      "id": "N1",
+      "paper": "A",
+      "question": "这篇论文用了多少只小白鼠？",
+      "status": 200,
+      "answer": "本文未涉及该内容",
+      "citationCount": 0,
+      "passed": true
+    },
+    {
+      "id": "N2",
+      "paper": "B",
+      "question": "这篇论文用了多少只小白鼠？",
+      "status": 200,
+      "answer": "本文未涉及该内容",
+      "citationCount": 0,
+      "passed": true
+    },
+    {
+      "id": "N3",
+      "paper": "C",
+      "question": "这篇论文用了多少只小白鼠？",
+      "status": 200,
+      "answer": "本文未涉及该内容",
+      "citationCount": 0,
+      "passed": true
+    }
+  ],
+  "manualHits": 9,
+  "manualTotal": 10,
+  "manualNote": "人工已确认所有答案无编造；A2/C1 答案不完整但不影响命中判定；B3 为唯一不命中。",
+  "gitCommitNote": "3c742d6 + 工作区改动（双栏块顺序、NUL 过滤）"
+}
