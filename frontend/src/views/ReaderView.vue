@@ -217,6 +217,31 @@ function commitPageInput() {
   goToPage(target)
 }
 
+// ===== #8 引用页码跳页 =====
+
+const flashPageNumber = ref(0)
+let flashTimer = 0
+
+/** 页码是否有效（1..pageCount），防止后端脏数据导致跳转异常 */
+function isValidPage(page) {
+  const n = Number(page)
+  return Number.isFinite(n) && n >= 1 && n <= pageCount.value
+}
+
+/** 点击引用页码：跳到对应页，并短暂高亮该页 */
+function jumpToCitation(page) {
+  if (!isValidPage(page)) return
+
+  const target = Number(page)
+  goToPage(target)
+
+  flashPageNumber.value = target
+  clearTimeout(flashTimer)
+  flashTimer = setTimeout(() => {
+    flashPageNumber.value = 0
+  }, 1200)
+}
+
 // 缩放前记录「当前页 + 页内偏移比例」，重绘后滚回同一位置 
 function captureAnchor(container) {
   if (!container) return null
@@ -413,6 +438,7 @@ onBeforeUnmount(() => {
     cancelAnimationFrame(scrollRafId)
     scrollRafId = 0
   }
+  clearTimeout(flashTimer)
   renderTasks.forEach((task) => {
     try {
       task.cancel()
@@ -526,7 +552,13 @@ onBeforeUnmount(() => {
         </p>
 
         <div class="page-list" :class="{ 'zoom-overflow': zoomedIn }">
-          <div v-for="n in pageCount" :key="n" :ref="(el) => setPageEl(n, el)" class="page">
+          <div
+            v-for="n in pageCount"
+            :key="n"
+            :ref="(el) => setPageEl(n, el)"
+            class="page"
+            :class="{ 'page-flash': n === flashPageNumber }"
+          >
             <canvas
               :ref="(el) => setCanvasEl(n, el)"
               class="pdf-canvas"
@@ -589,7 +621,15 @@ onBeforeUnmount(() => {
                   :key="ci"
                   class="citation-item"
                 >
-                  <span class="citation-page">第 {{ cite.page }} 页</span>
+                  <button
+                    type="button"
+                    class="citation-page"
+                    :disabled="!pageCount || pdfLoading || !isValidPage(cite.page)"
+                    :title="`跳转到第 ${cite.page} 页`"
+                    @click="jumpToCitation(cite.page)"
+                  >
+                    第 {{ cite.page }} 页
+                  </button>
                   <p class="citation-snippet">{{ cite.snippet }}</p>
                 </div>
               </div>
@@ -1021,12 +1061,30 @@ onBeforeUnmount(() => {
 }
 
 .citation-page {
-  font-size: 11px;
-  font-weight: 600;
-  color: #2563eb;
   display: inline-block;
   margin-bottom: 4px;
+  padding: 2px 9px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
 }
+
+.citation-page:hover:not(:disabled) {
+  border-color: #93c5fd;
+  background: #dbeafe;
+  text-decoration: underline;
+}
+
+.citation-page:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 
 .citation-snippet {
   margin: 0;

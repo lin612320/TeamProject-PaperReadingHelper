@@ -1,0 +1,15 @@
+﻿PaperMind Alpha · 第 9 天站会（2026-11-04）签入记录
+统计口径：上一份例会记录提交 6bef754 之后至 HEAD
+仓库：lin612320/TeamProject-PaperReadingHelper   分支：master
+导出时间：2026-11-04 20:40:11
+提交数：9
+
+e3c955f | 11-04 20:05 | 林子航 | docs: 更正 D9 走查结论——③ 真机渲染通过（原 BUG-010 撤回），④ 错误分支已验、正例待 AI 服务 (#4)
+5858db8 | 11-04 19:49 | 林子航 | docs: D9 端到端走查表（1 通过/1 部分/3 断/1 未测）与三张截图留证 (#4)
+8418f59 | 11-04 18:45 | 林子航 | docs: 记录 D9 燃尽数据（12/28，理想 11，首次落后 1 条）并生成 D9 燃尽图 (#3)
+7d39ee8 | 11-04 17:59 | 刘征 | feat: docker compose up 一条命令起全栈，日志可查 (#23)
+4be6eb7 | 11-04 16:20 | Cheongfan | fix: 修复 requirements.txt 中 numpy 依赖缺失 (#19)
+588bb46 | 11-04 16:10 | Cheongfan | test: 新增 check_rag / check_qa 自检脚本并补充运行文档 (#19)
+dc84546 | 11-04 16:10 | Cheongfan | fix: bge-m3 优先读取本地缓存，避免联网核对导致长时间等待 (#19)
+1c91327 | 11-04 16:09 | Cheongfan | feat: 新增 /internal/qa/ask 接口与契约错误码映射 (#19)
+c36a249 | 11-04 16:09 | Cheongfan | feat: 新增论文问答服务层（检索 + Prompt + DeepSeek 调用）(#19)

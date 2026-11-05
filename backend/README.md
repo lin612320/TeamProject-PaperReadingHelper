@@ -29,33 +29,36 @@ Spring Boot · PostgreSQL(pgvector) · Redis
 - `reading_session`、`annotation`：**空表先建**，RC 用
 
 
-## 实际对外接口（Alpha）
+## 实际对外接口（Alpha 实现）
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/api/papers` | 上传 PDF，返回 `PaperDetail`（`parseStatus=pending`） |
+| POST | `/api/papers` | 上传 PDF，返回契约 `PaperDetail`（`parseStatus=pending`） |
 | GET | `/api/papers?page=&size=` | 列表，`created_at DESC`，返回 `{total, items}` |
-| GET | `/api/papers/{id}` | 详情 |
-| DELETE | `/api/papers/{id}` | 删除记录 + 磁盘文件 |
-| GET | `/api/papers/{id}/file` | PDF 二进制流 |
-| POST | `/api/qa/ask` | 转发到 ai-service，25s 超时 |
-| GET | `/api/redis/ping` | 调试接口，契约外，Beta 前移除 |
+| GET | `/api/papers/{id}` | 详情（含 `parseStatus`/`chunkCount`/`parseError`） |
+| DELETE | `/api/papers/{id}` | 删除记录 + 磁盘文件，`chunks` 由数据库级联清理 |
+| GET | `/api/papers/{id}/file` | PDF 二进制流，不暴露磁盘路径 |
+| POST | `/api/qa/ask` | 转发到 ai-service `/internal/qa/ask` |
+| GET | `/api/redis/ping` | **调试接口，契约外**，Beta 前移除 |
 
 ## 配置项
 
-| 配置 | 环境变量 | 默认值 |
-|---|---|---|
-| `spring.datasource.url` | `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/papermind` |
-| `spring.data.redis.host` | `REDIS_HOST` | `localhost` |
-| `app.upload-dir` | — | `uploads` |
-| `app.parse.mock` | `APP_PARSE_MOCK` | `false` |
-| `app.parse.force` | `APP_PARSE_FORCE` | `false` |
-| `app.parse.timeout-seconds` | `APP_PARSE_TIMEOUT` | `180` |
-| `app.ai-service.url` | — | `http://localhost:8000` |
+| 配置 | 环境变量 | 默认值 | 说明 |
+|---|---|---|---|
+| `spring.datasource.url` | `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/papermind` | 容器内由 compose 注入 |
+| `spring.data.redis.host` | `REDIS_HOST` | `localhost` | |
+| `app.upload-dir` | — | `uploads` | PDF 落盘目录（相对启动目录） |
+| `app.parse.mock` | `APP_PARSE_MOCK` | `false` | `true` 时返回固定 15 页/128 段，仅离线开发用 |
+| `app.parse.force` | `APP_PARSE_FORCE` | `false` | 透传给 ai-service，强制重建已有切片 |
+| `app.ai-service.url` | `AI_SERVICE_URL` | `http://localhost:8000` | 容器内为 `http://ai-service:8000` |
 
 ## 与 ai-service 对接的注意
 
-1. **必须用 HTTP/1.1**：JDK `HttpClient` 默认尝试 h2c 升级，uvicorn 不支持，请求体会丢失（表现为 422 body 缺失）。解析调用显式 `.version(HTTP_1_1)`。
-2. **超时分级**：解析 180s（后台异步），问答 25s（对齐 02 契约；原文「建议 30s」以契约为准）。
-3. **错误码翻译**：内部 `{code, message}` → 对外 1001/1002/2001/2002/2003/3001/3002/5000。
-4. **解析异步**：上传只做存盘 + 插 `pending`，后台线程调 ai-service，成功置 `ready`，失败置 `failed` 并写 `parse_error`。
+### 1. 必须使用 HTTP/1.1
+
+JDK 的 `HttpClient` 默认尝试 HTTP/2 升级（h2c），uvicorn 不支持，请求体会在升级协商中丢失，服务端表现为 body 为空（422）。
+
+```java
+HttpClient.newBuilder()
+    .version(HttpClient.Version.HTTP_1_1)   // 必须，否则请求体丢失
+    .build();

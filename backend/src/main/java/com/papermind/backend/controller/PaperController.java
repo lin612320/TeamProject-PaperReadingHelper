@@ -138,8 +138,8 @@ public class PaperController {
             throw new BizException(ErrorCode.INVALID_PARAM);
         }
 
-        // BUG-004：不只看 Content-Type，还要看文件头是不是 %PDF
-        if (!isPdf(file)) {
+        String originalName = file.getOriginalFilename();
+        if (originalName == null || !originalName.toLowerCase().endsWith(".pdf")) {
             throw new BizException(ErrorCode.FILE_NOT_PDF);
         }
 
@@ -156,7 +156,6 @@ public class PaperController {
             throw new BizException(ErrorCode.STORAGE_ERROR);
         }
 
-        String originalName = file.getOriginalFilename();
         String title = (originalName != null && originalName.contains("."))
             ? originalName.substring(0, originalName.lastIndexOf('.'))
             : originalName;

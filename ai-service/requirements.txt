@@ -1,5 +1,7 @@
+numpy
 fastapi
 uvicorn[standard]
 psycopg[binary]
 python-dotenv
 pymupdf
+sentence-transformers

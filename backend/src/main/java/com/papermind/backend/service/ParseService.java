@@ -24,6 +24,10 @@ public class ParseService {
     @Value("${app.parse.force:false}")
     private boolean force;
 
+    /** 解析接口超时（秒）。CPU 上 bge-m3 约 0.7 秒/切片，20 页论文约 60 秒起 */
+    @Value("${app.parse.timeout-seconds:180}")
+    private long parseTimeoutSeconds;
+
     @Value("${app.ai-service.url:http://localhost:8000}")
     private String aiServiceUrl;
 
@@ -33,6 +37,7 @@ public class ParseService {
 
     @Async
     public void parseAsync(Long paperId, String filePath) {
+        long startMs = System.currentTimeMillis();
         try {
             jdbcTemplate.update(
                 "UPDATE papers SET parse_status = 'parsing', parse_error = NULL WHERE id = ?", paperId);
@@ -53,7 +58,8 @@ public class ParseService {
                 String json = new com.fasterxml.jackson.databind.ObjectMapper()
                     .writeValueAsString(req);
 
-                java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()      // AI 服务（uvicorn）不支持 h2c 升级，必须强制 HTTP/1.1，否则请求体会丢失
+                // AI 服务（uvicorn）不支持 h2c 升级，必须强制 HTTP/1.1，否则请求体会丢失
+                java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()
                     .version(java.net.http.HttpClient.Version.HTTP_1_1)
                     .connectTimeout(java.time.Duration.ofSeconds(3))
                     .followRedirects(java.net.http.HttpClient.Redirect.NEVER)
@@ -61,7 +67,7 @@ public class ParseService {
 
                 java.net.http.HttpRequest httpRequest = java.net.http.HttpRequest.newBuilder()
                     .uri(java.net.URI.create(aiServiceUrl + "/internal/papers/parse"))
-                    .timeout(java.time.Duration.ofSeconds(25))
+                    .timeout(java.time.Duration.ofSeconds(parseTimeoutSeconds))
                     .header("Content-Type", "application/json; charset=utf-8")
                     .POST(java.net.http.HttpRequest.BodyPublishers.ofString(
                         json, java.nio.charset.StandardCharsets.UTF_8))
@@ -71,8 +77,8 @@ public class ParseService {
                     client.send(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofString());
 
                 if (httpResponse.statusCode() != 200) {
-                    throw new IllegalStateException("AI 服务返回 "
-                        + httpResponse.statusCode() + ": " + httpResponse.body());
+                    throw new IllegalStateException("AI 服务返回 " + httpResponse.statusCode()
+                        + "：" + shorten(httpResponse.body(), 300));
                 }
 
                 Map<?, ?> body = new com.fasterxml.jackson.databind.ObjectMapper()
@@ -89,15 +95,36 @@ public class ParseService {
                 "UPDATE papers SET parse_status = 'ready', page_count = ?, chunk_count = ? WHERE id = ?",
                 pageCount, chunkCount, paperId);
 
+            log.info("parse done paperId={} cost={}ms pageCount={} chunkCount={}",
+                paperId, System.currentTimeMillis() - startMs, pageCount, chunkCount);
+
+        } catch (java.net.http.HttpConnectTimeoutException e) {
+            fail(paperId, "无法连接 AI 服务（" + aiServiceUrl + "）：连接超时，请确认 ai-service 已启动", e);
+        } catch (java.net.http.HttpTimeoutException e) {
+            fail(paperId, "解析超时：AI 服务未在 " + parseTimeoutSeconds
+                + " 秒内返回（文档切片较多或服务繁忙）", e);
+        } catch (java.net.ConnectException e) {
+            fail(paperId, "无法连接 AI 服务（" + aiServiceUrl + "）：连接被拒绝，请确认 ai-service 已启动", e);
         } catch (Exception e) {
-            log.error("parse failed, paperId={}", paperId, e);
-            String msg = e.getMessage() == null ? "unknown error" : e.getMessage();
-            if (msg.length() > 500) {
-                msg = msg.substring(0, 500);
-            }
-            jdbcTemplate.update(
-                "UPDATE papers SET parse_status = 'failed', parse_error = ? WHERE id = ?",
-                msg, paperId);
+            String detail = (e.getMessage() == null || e.getMessage().isBlank())
+                ? e.getClass().getSimpleName()
+                : e.getMessage();
+            fail(paperId, "解析失败：" + detail, e);
         }
+    }
+
+    /** 统一写失败原因（BUG-008：不再只写 unknown error） */
+    private void fail(Long paperId, String reason, Exception e) {
+        log.error("parse failed, paperId={} reason={}", paperId, reason, e);
+        jdbcTemplate.update(
+            "UPDATE papers SET parse_status = 'failed', parse_error = ? WHERE id = ?",
+            shorten(reason, 500), paperId);
+    }
+
+    private String shorten(String s, int max) {
+        if (s == null) {
+            return "";
+        }
+        return s.length() <= max ? s : s.substring(0, max);
     }
 }
