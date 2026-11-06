@@ -18,6 +18,9 @@ class LLMTimeout(Exception):
 class LLMError(Exception):
     """大模型调用失败（未配置 Key、网络错误、返回格式异常等）。"""
 
+class LLMAuthError(LLMError):
+    """大模型鉴权失败（API Key 无效或无权访问）。"""
+
 def model_name(model=None):
     """本次请求使用的模型名：请求参数优先，其次 .env。"""
     if model is not None and model.strip() != "":
@@ -81,6 +84,8 @@ def chat(messages, timeout=DEFAULT_TIMEOUT, api_key=None, base_url=None, model=N
         raise LLMTimeout("大模型请求超时")
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", errors="replace")[:300]
+        if e.code in (401, 403):
+            raise LLMAuthError("API Key 无效或无权访问（HTTP %s）: %s" % (e.code, detail))
         raise LLMError("大模型返回 HTTP %s: %s" % (e.code, detail))
     except urllib.error.URLError as e:
         if isinstance(e.reason, (socket.timeout, TimeoutError)):

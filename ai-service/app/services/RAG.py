@@ -149,6 +149,8 @@ def answer_question(paper_id, question, top_k=3, max_citations=3,
         )
     except llm_client.LLMTimeout:
         raise QaError("LLM_TIMEOUT", "大模型请求超时")
+    except llm_client.LLMAuthError as e:
+        raise QaError("LLM_AUTH_ERROR", "大模型鉴权失败: " + str(e))
     except Exception as e:
         raise QaError("LLM_ERROR", "大模型调用失败: " + str(e))
 
