@@ -177,8 +177,12 @@ public class QaController {
         if ("LLM_TIMEOUT".equals(code)) {
             return ErrorCode.AI_SERVICE_TIMEOUT;
         }
+        if ("LLM_AUTH_ERROR".equals(code)) {
+            return ErrorCode.AI_SERVICE_AUTH_ERROR;
+        }
 
-        if (status == 401) return ErrorCode.AI_SERVICE_ERROR;
+        if (status == 401) return ErrorCode.AI_SERVICE_AUTH_ERROR;
+        if (status == 403) return ErrorCode.AI_SERVICE_AUTH_ERROR;
         if (status == 404) return ErrorCode.PAPER_NOT_FOUND;
         if (status == 409) return ErrorCode.PAPER_NOT_READY;
         if (status == 422) return ErrorCode.EMPTY_QUESTION;
