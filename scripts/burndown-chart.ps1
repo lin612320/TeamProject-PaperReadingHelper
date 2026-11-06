@@ -33,7 +33,9 @@ for ($i = 0; $i -lt $rows.Count; $i++) {
     if (-not [string]::IsNullOrWhiteSpace($r.'理想剩余Issue')) { $ideal = [double]$r.'理想剩余Issue' }
     $actual = $null
     if (-not [string]::IsNullOrWhiteSpace($r.'实际剩余Issue')) { $actual = [double]$r.'实际剩余Issue' }
-    $points += [pscustomobject]@{ Day = $dayNum; Label = $r.'工作日'; Ideal = $ideal; Actual = $actual }
+    $added = 0
+    if (-not [string]::IsNullOrWhiteSpace($r.'当日新增数')) { $added = [int]$r.'当日新增数' }
+    $points += [pscustomobject]@{ Day = $dayNum; Label = $r.'工作日'; Ideal = $ideal; Actual = $actual; Added = $added }
 }
 
 $maxY = ($points | ForEach-Object { $_.Ideal } | Measure-Object -Maximum).Maximum
@@ -133,7 +135,12 @@ if ($filled.Count -gt 0) {
     $dev = $last.Actual - $last.Ideal
     $state = '正常'
     $stateColor = ([System.Drawing.Color]::FromArgb(30,140,60))
-    if ($dev -ge 5) { $state = '严重落后，建议砍范围'; $stateColor = ([System.Drawing.Color]::FromArgb(200,40,40)) }
+    if ($last.Added -gt 0) {
+        # 范围变更：当日新增了 Issue（如被要求扩范围），此处的正向偏差不是落后，不能按落后打分
+        $state = "范围变更（当日新增 $($last.Added) 条），偏差不计入落后"
+        $stateColor = ([System.Drawing.Color]::FromArgb(90,90,160))
+    }
+    elseif ($dev -ge 5) { $state = '严重落后，建议砍范围'; $stateColor = ([System.Drawing.Color]::FromArgb(200,40,40)) }
     elseif ($dev -ge 3) { $state = '落后，需处理阻塞'; $stateColor = ([System.Drawing.Color]::FromArgb(210,130,20)) }
     elseif ($dev -le -1) { $state = '领先理想线'; $stateColor = ([System.Drawing.Color]::FromArgb(30,140,60)) }
     $info = "{0}：实际 {1}，理想 {2}，偏差 {3:+#;-#;0}  —— {4}" -f $last.Label, $last.Actual, $last.Ideal, $dev, $state

@@ -220,6 +220,13 @@ Write-Host ""
 Write-Host '  迷你燃尽图（█ 实际  · 理想）' -ForegroundColor DarkGray
 $maxBar = 28
 foreach ($r in $rows) {
+    foreach ($col in @('实际剩余Issue', '理想剩余Issue')) {
+        if (-not [string]::IsNullOrWhiteSpace($r.$col)) {
+            $maxBar = [math]::Max($maxBar, [int]$r.$col)
+        }
+    }
+}
+foreach ($r in $rows) {
     if ([string]::IsNullOrWhiteSpace($r.'实际剩余Issue')) { continue }
     $v = [int]$r.'实际剩余Issue'
     $len = [math]::Max(0, [math]::Round($v / $maxBar * 28))
