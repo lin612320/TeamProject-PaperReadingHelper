@@ -1,4 +1,4 @@
-# Alpha Bug List
+﻿# Alpha Bug List
 
 > P7 李义朋 · [#25](https://github.com/lin612320/TeamProject-PaperReadingHelper/issues/25) · v0.7 · 2026-11-06 · 测试版本 `master`（容器化）
 
@@ -18,6 +18,7 @@
 | **BUG-012** | `master`（容器化） | 一条命令起全栈后上传必然解析失败：`EMBEDDING_FAILED — couldn't connect to hf-mirror.com ... not in cached files` | `docker compose up -d` 后上传 PDF，`GET /api/papers/{id}` → `failed`；`docker compose exec ai-service ls /root/.cache/huggingface` 为空 | 主链断在解析，演示第 3 步之后不可用 | S1 | P6 / P5 | 待修复 |
 | **BUG-013** | `master`（容器化） | 阅读页无法加载 PDF：`pdf_worker_min-*.mjs` 被 nginx 以 `application/octet-stream` 返回，浏览器按 ES 模块规范拒绝执行，pdf.js 降级 fake worker 后渲染失败 | 容器起全栈后打开任意论文阅读页；F12 Console 报 `Failed to load module script: ... non-JavaScript MIME type of "application/octet-stream"`；同一 id 的 `/file` 接口 curl 返回 200 / `application/pdf` | 容器环境阅读链路整体不可用（F2 组、E2E-3/5 不可演示）；前端提示误报为「无法连接到服务器」（该文案问题已并入本条影响，不单列） | S1 | P3 / P6 | 待修复 |
 | **BUG-015** | `master`（容器化） | `papers.file_path` 存绝对路径，切换运行方式后旧记录文件不可读：宿主机为 `C:\...\backend\uploads\...`，容器内该路径不存在 | 手工运行后端时上传若干论文 → 切到容器运行 → 点开这些论文报「打不开这份文献」 | 同一数据库切换运行环境后旧数据不可用（测试/演示易踩，真实用户少见） | S2 | P4 | 待确定 |
+| **BUG-016** | `master`（本地 + 容器） | API Key 设置页填了不生效：`QaController.java:79-82` 组装转发请求时只带 `paperId/question/topK/maxCitations`，把 `apiKey` / `baseUrl` / `model` 丢了，实际用的是服务端 `.env` | 传假 Key 仍正常作答：`curl -X POST /api/qa/ask -H "Content-Type: application/json" -d "{""paperId"":13,""question"":""10-30 那天站会剩余 Issue 是多少？"",""apiKey"":""sk-fake""}"` → HTTP 200（应当认证失败） | 用户自己填的 Key 永远不生效，会认为这个功能是假的；契约 1.0.2 已定义该字段 | S1 | P4 | 待修复 |
 
 级别：**S0** 主链断（演示走不通）· **S1** 验收不达标 · **S2** 体验或契约一致性
 （S = Severity 严重程度，与分工编号 P1–P7 区分；归属列的 P3/P4 才是人）
