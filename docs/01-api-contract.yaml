@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: PaperMind API
-  version: 1.0.1-frozen
+  version: 1.0.2-frozen
   description: |
     PaperMind 论文阅读助手接口契约（**已冻结 1.0.0**，2026-10-24 由 P1 裁定冻结；变更须经 P1 并升版本号）。
 
@@ -338,6 +338,23 @@ components:
           minLength: 1
           maxLength: 500
           example: 这篇文章提出的方法核心是什么？
+        apiKey:
+          type: string
+          nullable: true
+          description: |
+            （1.0.2 新增）用户在「设置」页填写的 DeepSeek API Key，按次传入。
+            - 为空或缺失时，AI 服务回退使用服务端 .env 里的 DEEPSEEK_API_KEY
+            - 服务端不得落库、不得写入日志、不得回显
+            - 前端存放位置由实现决定（当前为浏览器 localStorage），设置页需提示「仅保存在本机浏览器」
+          example: sk-xxxxxxxx
+        baseUrl:
+          type: string
+          nullable: true
+          description: （1.0.2 新增）可选，覆盖服务端默认的 DEEPSEEK_BASE_URL
+        model:
+          type: string
+          nullable: true
+          description: （1.0.2 新增）可选，覆盖服务端默认的 LLM_MODEL
 
     AskResult:
       type: object
