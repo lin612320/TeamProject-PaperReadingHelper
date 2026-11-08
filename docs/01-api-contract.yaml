@@ -1,18 +1,18 @@
 openapi: 3.0.3
 info:
   title: PaperMind API
-  version: 1.0.1-frozen
+  version: 1.1.0-frozen
   description: |
-    PaperMind 论文阅读助手接口契约（**已冻结 1.0.0**，2026-10-24 由 P1 裁定冻结；变更须经 P1 并升版本号）。
+    PaperMind 论文阅读助手接口契约（**1.1.0 已冻结**，2026-11-08 由 P1 裁定；1.0.0 于 2026-10-24 冻结，变更须经 P1 并升版本号）。
 
     约定：
     - 所有响应统一包装为 ApiResponse，成功 code=0
-    - 时间统一 ISO 8601（Asia/Shanghai）
+    - 时间统一 ISO 8601（Asia/Shanghai）——**必须是本地时间，不得返回无时区语义的裸字符串**
     - 错误必须返回结构化 code + message，禁止裸抛堆栈
     - 分页参数统一 page（从 1 开始）/ size（默认 20，最大 100）
     - **页码 page 一律从 1 开始（1-based）**，0 或负数视为非法
-    - **引用坐标 bbox 归一化为 0~1 的相对值**（相对当页宽高，左上为原点）；Alpha 阶段一律返回 null
-    - 检索接口（/api/search）为 Beta 阶段预留，Alpha 不实现
+    - **引用坐标 bbox 归一化为 0~1 的相对值**（相对当页宽高，左上为原点）；**1.1.0 起实际填充**（原计划 Beta，延展段 #40 提前实现），无法精确定位时降级为整块框并标 `bboxMode`
+    - 检索接口 `/api/search` **1.1.0 起实装**（原计划 Beta，延展段 #38 提前实现），仅取开放获取全文链接
     - 详见文末 `x-conventions` 一节的错误码表与上传限制
 
 servers:
@@ -157,13 +157,21 @@ paths:
   /api/search:
     get:
       tags: [search]
-      summary: 关键词检索外部学术库（Beta 预留，Alpha 不实现）
+      summary: 关键词检索外部学术库（1.1.0 起实装）
       description: |
-        Beta 实现 F5-a：arXiv + OpenAlex；RC 实现多源聚合去重与排序。
-        合规红线：只取开放获取全文链接，非 OA 仅返回 landingUrl。
+        延展段提前实现 F5-a（原计划 Beta）。**主源 arXiv，OpenAlex 作为第二源兜底**；RC 再做多源聚合去重与排序。
+
+        合规红线：只取**开放获取（OA）**全文链接；非 OA 只返回 `landingUrl`，禁止绕过付费墙。
+
+        降级约定（必须有，校园网到境外接口不稳定）：
+        - 单次外部请求超时 **10 秒**即返回已拿到的结果，`data.degraded=true`，不得 500
+        - 无任何结果又外部不可达时，返回空列表 + `data.degraded=true`
+        - 命中 Redis 缓存（24 小时）时 `data.cached=true`
+
+        导入：拿到结果后由前端调 `POST /api/papers/import`（见下）落库并返回 paperId，之后直接进问答主链。
       operationId: searchPapers
       deprecated: false
-      x-status: beta-reserved
+      x-status: implemented-1.1.0
       parameters:
         - name: keyword
           in: query
@@ -183,11 +191,41 @@ paths:
           schema: { type: integer, default: 10, minimum: 1, maximum: 50 }
       responses:
         "200":
-          description: 检索结果（Beta 才返回数据）
+          description: 检索结果；降级时 degraded=true，命中缓存时 cached=true
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiResponsePaperMetaList"
+
+  /api/papers/import:
+    post:
+      tags: [search]
+      summary: 把检索到的一条论文导入本库（1.1.0 新增）
+      description: |
+        入参是 `/api/search` 返回的 `PaperMeta` 原样回传（或只传 `arxivId` / `doi` / `pdfUrl` 之一 + `title`）。
+        行为：下载 OA 全文 PDF 到本地上传目录 → 建 `papers` 记录 → 返回 `paperId`，前端随后可直接 `/reader/{paperId}` 提问。
+        非 OA 或下载失败 → `3001`（AI/上游取文失败），message 说明「该论文非开放获取，仅提供原文链接」。
+      operationId: importPaper
+      x-status: implemented-1.1.0
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaperMeta"
+      responses:
+        "200":
+          description: 导入成功，返回新 paperId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+        "400":
+          description: 参数缺失或不是 OA 全文
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
 
 components:
   parameters:
@@ -258,6 +296,12 @@ components:
                   type: array
                   items:
                     $ref: "#/components/schemas/PaperMeta"
+                degraded:
+                  type: boolean
+                  description: 外部数据源不可达或超时，返回的是部分结果或缓存（1.1.0 新增）
+                cached:
+                  type: boolean
+                  description: 命中 24 小时 Redis 缓存，未真的访问外部库（1.1.0 新增）
 
     Paper:
       type: object
@@ -317,7 +361,7 @@ components:
         bboxX0:
           type: number
           nullable: true
-          description: 归一化左上 x（相对页宽 0~1），Alpha 为 null，Beta 填充
+          description: 归一化左上 x（相对页宽 0~1）。1.1.0 起实际填充；无法精确定位时为整块框，见 bboxMode
         bboxY0:
           type: number
           nullable: true
@@ -327,6 +371,16 @@ components:
         bboxY1:
           type: number
           nullable: true
+        bboxMode:
+          type: string
+          nullable: true
+          enum: [precise, block]
+          description: |
+            bbox 的精度来源（1.1.0 新增）：
+            - `precise` = 单栏正文，框对应原句所在块，前端可直接画细框
+            - `block`   = 双栏或版面复杂，框是整块/整段范围，**前端不得当作逐句精确定位**
+            - `null`    = 无坐标，前端退回「只跳页不画框」
+          example: precise
 
     AskRequest:
       type: object
@@ -338,6 +392,23 @@ components:
           minLength: 1
           maxLength: 500
           example: 这篇文章提出的方法核心是什么？
+        apiKey:
+          type: string
+          nullable: true
+          description: |
+            （1.0.2 新增）用户在「设置」页填写的 DeepSeek API Key，按次传入。
+            - 为空或缺失时，AI 服务回退使用服务端 .env 里的 DEEPSEEK_API_KEY
+            - 服务端不得落库、不得写入日志、不得回显
+            - 前端存放位置由实现决定（当前为浏览器 localStorage），设置页需提示「仅保存在本机浏览器」
+          example: sk-xxxxxxxx
+        baseUrl:
+          type: string
+          nullable: true
+          description: （1.0.2 新增）可选，覆盖服务端默认的 DEEPSEEK_BASE_URL
+        model:
+          type: string
+          nullable: true
+          description: （1.0.2 新增）可选，覆盖服务端默认的 LLM_MODEL
 
     AskResult:
       type: object
@@ -395,6 +466,26 @@ x-conventions:
       major_2_0_0: 删除/重命名字段、改语义（如页码起点） —— 禁止在 Alpha 内发生，只能进 Beta
     who_approves: P1 林子航（各组员不得私自改本文件）
 
+    changelog:
+      - version: 1.0.0
+        date: 2026-10-24
+        note: 首次冻结（P1 提前裁定，D1 站会通报全员）
+      - version: 1.0.1
+        date: 2026-11-05
+        note: 内部服务契约拆出解析 180 秒 / 问答 25 秒；bbox 坐标系补 #7 预研结论
+      - version: 1.0.2
+        date: 2026-11-06
+        note: AskRequest 新增 apiKey / baseUrl / model（密钥不得落库、不得写日志、不得回显）
+      - version: 1.1.0
+        date: 2026-11-08
+        note: |
+          延展段把 Beta 两项主菜提前，minor 升级：
+          1. /api/search 由预留转实装（arXiv 主源 + OpenAlex 兜底，10 秒超时降级、24 小时缓存），响应增 degraded / cached
+          2. 新增 POST /api/papers/import：检索结果一键入库并返回 paperId
+          3. Citation 增 bboxMode（precise / block / null），bbox 四字段由 null 改为真实填充
+          4. 新增错误码 3003 AI_SERVICE_AUTH_ERROR（HTTP 400），替代此前误用的 2002
+          5. 时间约定补充：必须返回带时区语义的 Asia/Shanghai 时间，禁止裸字符串
+
   pagination:
     page_starts_at: 1
     default_size: 20
@@ -406,7 +497,11 @@ x-conventions:
     bbox_range: "0.0 ~ 1.0"
     bbox_origin: 左上角为原点，x 向右、y 向下
     bbox_relative_to: 单页宽度 / 单页高度
-    alpha_behavior: 四个 bbox 字段一律返回 null，Beta 阶段填充
+    alpha_behavior: ❌ 已作废（1.0.x 写「四个 bbox 字段一律返回 null」）—— 1.1.0 起真实填充
+    behavior_1_1_0: "单栏论文返回精确块坐标并标 bboxMode=precise；双栏或复杂版面降级为整块范围并标 bboxMode=block；确实无法定位时四个字段为 null 且 bboxMode 为 null，前端退回「只跳页不画框」"
+    bbox_mode_field: "接口字段 bboxMode（camelCase）；数据库列建议 bbox_mode（可空，取值 precise/block）；AI 服务内部为 bbox_mode"
+    bbox_mode_db_status: "⚠️ 2026-11-08 核对：docs/03-数据库表结构.sql 只有 bbox_x0/y0/x1/y1，尚无 bbox_mode 列，需 P6 补迁移"
+    bbox_mode_ddl: "ALTER TABLE chunks ADD COLUMN bbox_mode TEXT CHECK (bbox_mode IN ('precise','block'));"
     # ↓ 1.0.1 新增：来自 P2 #7 预研结论，详见 docs/bbox坐标约定.md
     page_meaning: 使用物理页码（封面、目录计入页数），不使用 PDF 内置页码标签 label
     rotated_page: 旋转页建系不变（原点仍在左上），分母使用旋转后用户看到的当页宽高
@@ -436,6 +531,11 @@ x-conventions:
       - { code: 2003,  http: 422, name: EMPTY_QUESTION,    message: "问题不能为空" }
       - { code: 3001,  http: 502, name: AI_SERVICE_ERROR,  message: "AI 服务调用失败" }
       - { code: 3002,  http: 504, name: AI_SERVICE_TIMEOUT,message: "AI 服务超时（>30s）" }
+      # ↓ 1.1.0 新增（2026-11-08）：用户自填的 API Key 无效时专用。
+      #   不复用 2002（那是文献未解析完成）：Key 错却显示「文献还在解析」，用户会一直等一个永不结束的状态。
+      #   不复用 3001（那是 502，语义是「我方服务故障」）：Key 错属于用户可自改的错误，应给 400。
+      #   不用 401：本项目无登录态，401 会被前端通用拦截误判为「会话失效」。
+      - { code: 3003,  http: 400, name: AI_SERVICE_AUTH_ERROR, message: "API Key 无效，请到设置页检查" }
       - { code: 4001,  http: 500, name: STORAGE_ERROR,     message: "文件存储失败" }
       - { code: 5000,  http: 500, name: INTERNAL_ERROR,    message: "服务器内部错误" }
 

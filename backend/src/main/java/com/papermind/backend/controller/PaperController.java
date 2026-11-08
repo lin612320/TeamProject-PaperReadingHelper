@@ -32,6 +32,9 @@ import java.util.UUID;
 @RequestMapping("/api/papers")
 public class PaperController {
 
+    private static final String CREATED_AT_SQL =
+        "to_char(created_at AT TIME ZONE 'Asia/Shanghai', 'YYYY-MM-DD\"T\"HH24:MI:SS') AS \"createdAt\" ";
+
     @Value("${app.upload-dir}")
     private String uploadDir;
 
@@ -57,7 +60,7 @@ public class PaperController {
                 + "page_count AS \"pageCount\", "
                 + "parse_status AS \"parseStatus\", "
                 + "source, "
-                + "to_char(created_at, 'YYYY-MM-DD\"T\"HH24:MI:SS') AS \"createdAt\" "
+                + CREATED_AT_SQL
                 + "FROM papers WHERE user_id = 1 "
                 + "ORDER BY created_at DESC LIMIT ? OFFSET ?",
             size, (page - 1) * size);
@@ -79,16 +82,16 @@ public class PaperController {
     @GetMapping("/{paperId}/file")
     public ResponseEntity<byte[]> file(@PathVariable Long paperId) {
 
-        String filePath;
+        String storedPath;
         try {
-            filePath = jdbcTemplate.queryForObject(
+            storedPath = jdbcTemplate.queryForObject(
                 "SELECT file_path FROM papers WHERE id = ? AND user_id = 1",
                 String.class, paperId);
         } catch (EmptyResultDataAccessException e) {
             throw new BizException(ErrorCode.PAPER_NOT_FOUND);
         }
 
-        File pdf = new File(filePath);
+        File pdf = resolveFile(storedPath);
         if (!pdf.exists()) {
             throw new BizException(ErrorCode.PAPER_NOT_FOUND);
         }
@@ -109,9 +112,9 @@ public class PaperController {
     @DeleteMapping("/{paperId}")
     public ApiResponse<Void> delete(@PathVariable Long paperId) {
 
-        String filePath;
+        String storedPath;
         try {
-            filePath = jdbcTemplate.queryForObject(
+            storedPath = jdbcTemplate.queryForObject(
                 "SELECT file_path FROM papers WHERE id = ? AND user_id = 1",
                 String.class, paperId);
         } catch (EmptyResultDataAccessException e) {
@@ -120,11 +123,10 @@ public class PaperController {
 
         jdbcTemplate.update("DELETE FROM papers WHERE id = ? AND user_id = 1", paperId);
 
-        if (filePath != null) {
+        if (storedPath != null) {
             try {
-                Files.deleteIfExists(new File(filePath).toPath());
+                Files.deleteIfExists(resolveFile(storedPath).toPath());
             } catch (IOException ignored) {
-                // 删文件失败不影响数据库删除
             }
         }
 
@@ -143,7 +145,11 @@ public class PaperController {
             throw new BizException(ErrorCode.FILE_NOT_PDF);
         }
 
-        File dir = new File(uploadDir);
+        if (!isPdf(file)) {
+            throw new BizException(ErrorCode.FILE_NOT_PDF);
+        }
+
+        File dir = new File(uploadDir).getAbsoluteFile();
         if (!dir.exists() && !dir.mkdirs()) {
             throw new BizException(ErrorCode.STORAGE_ERROR);
         }
@@ -151,12 +157,12 @@ public class PaperController {
         String savedName = UUID.randomUUID() + ".pdf";
         File target = new File(dir, savedName);
         try {
-            file.transferTo(target.getAbsoluteFile());
+            file.transferTo(target);
         } catch (IOException e) {
             throw new BizException(ErrorCode.STORAGE_ERROR);
         }
 
-        String title = (originalName != null && originalName.contains("."))
+        String title = (originalName.contains("."))
             ? originalName.substring(0, originalName.lastIndexOf('.'))
             : originalName;
 
@@ -164,12 +170,19 @@ public class PaperController {
             "INSERT INTO papers (title, filename, file_path, file_size_bytes, parse_status) "
                 + "VALUES (?, ?, ?, ?, 'pending') RETURNING id",
             Long.class,
-            title, originalName, target.getAbsolutePath(), file.getSize());
+            title, originalName, savedName, file.getSize());
 
         parseService.parseAsync(newId, target.getAbsolutePath());
 
-        // BUG-002 / BUG-003：直接返回契约规定的 PaperDetail，不再暴露 path / size
         return ApiResponse.ok(loadDetail(newId));
+    }
+
+    private File resolveFile(String storedPath) {
+        File f = new File(storedPath);
+        if (f.isAbsolute()) {
+            return f;
+        }
+        return new File(new File(uploadDir).getAbsoluteFile(), storedPath);
     }
 
     private Map<String, Object> loadDetail(Long paperId) {
@@ -184,7 +197,7 @@ public class PaperController {
                     + "arxiv_id AS \"arxivId\", "
                     + "external_url AS \"externalUrl\", "
                     + "file_size_bytes AS \"fileSize\", "
-                    + "to_char(created_at, 'YYYY-MM-DD\"T\"HH24:MI:SS') AS \"createdAt\" "
+                    + CREATED_AT_SQL
                     + "FROM papers WHERE id = ? AND user_id = 1",
                 paperId);
         } catch (EmptyResultDataAccessException e) {
