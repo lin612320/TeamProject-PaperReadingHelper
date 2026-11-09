@@ -20,6 +20,15 @@ function formatPdfError(error) {
   const msg = error?.message || ''
 
   if (/[\u4e00-\u9fa5]/.test(msg)) return msg
+  if (
+    msg.includes('fake worker') ||
+    msg.includes('Failed to load module script') ||
+    msg.includes('MIME type') ||
+    msg.includes('workerSrc') ||
+    msg.includes('Cannot use the specified')
+  ) {
+    return 'PDF 渲染组件加载失败，请刷新页面重试；若持续出现，请联系管理员检查静态资源配置'
+  }
   if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('server response')) {
     return '无法连接到服务器，请检查网络或后端服务是否启动'
   }

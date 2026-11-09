@@ -1,6 +1,6 @@
 # Alpha Bug List
 
-> P7 李义朋 · [#25](https://github.com/lin612320/TeamProject-PaperReadingHelper/issues/25) · v1.0 · 2026-11-07 · 测试版本 `master`（容器化）
+> P7 李义朋 · [#25](https://github.com/lin612320/TeamProject-PaperReadingHelper/issues/25) · v1.1 · 2026-11-08 · 测试版本 `master`（容器化）
 > 版式：概览表（5 列，一屏可读）+ 每条明细分块。
 
 ## 概览
@@ -18,17 +18,17 @@
 | BUG-009 | S2 | P4 + P7 | 已修复 | `.docx` 后缀被接口接受 |
 | BUG-010 | S0 | P4 | 已修复 | 解析超时（25s 上限 vs 实际 60s+） |
 | BUG-011 | S2 | P4 | 已修复 | 上传时间早 8 小时 |
-| BUG-012 | S1 | P6（主）/ P5 | 待修复 | 容器无模型，解析必失败（且假健康） |
-| BUG-013 | S1 | P6 | 待修复 | nginx 不认 `.mjs`，阅读页白屏 |
+| BUG-012 | S1 | P6（主）/ P5 | 不修复（接受风险） | 容器无模型，解析必失败（且假健康） |
+| BUG-013 | S1 | P6 | 已修复 | nginx 不认 `.mjs`，阅读页白屏 |
 | BUG-015 | S2 | P4 | 已修复 | `file_path` 存绝对路径，换环境读不到 |
 | BUG-016 | S1 | P4 | 已修复 | `apiKey` 未转发，用户 Key 不生效 |
 
-**统计**：15 条 · 已修复 13 · 待修复 2（012、013）
+**统计**：15 条 · 已修复 14 · 不修复 1（BUG-012，D13 决定接受风险）
 
 级别：**S0** 主链断（演示走不通）· **S1** 验收不达标 · **S2** 体验或契约一致性
 （S = Severity，与分工编号 P1–P7 区分；归属列的 P3/P4 才是人）
 
-状态：待修复 / 已修复。（原「待确定」的 BUG-015 经组长核实**属实**，已转「待修复」）
+状态：待修复 / 已修复 / **不修复（接受风险）**。（不修复 = 例会已决定承担该风险，需写明前提与后果；原「待确定」的 BUG-015 经组长核实属实，已转「待修复」并已复测通过）
 
 ---
 
@@ -103,19 +103,23 @@
 - **修法**：`to_char(created_at AT TIME ZONE 'Asia/Shanghai', ...)` 或返回带 `Z` 的完整 ISO 交前端转换；**禁止前端硬加 8 小时**。
 - **复测**：`PaperController.java:36` 已改为 `to_char(created_at AT TIME ZONE 'Asia/Shanghai', ...)`；接口返回与库内时间一致、带时区语义，2026-11-07 复测通过。
 
-### BUG-012 · 容器无模型，解析必失败（且假健康）（S1 · P6（主）/ P5 · 待修复）
+### BUG-012 · 容器无模型，解析必失败（且假健康）（S1 · P6（主）/ P5 · 不修复）
 - **版本**：`master`（容器化）
 - **现象**：`EMBEDDING_FAILED — couldn't connect to hf-mirror.com ... not in cached files`。成因：`ai-service/Dockerfile` 无模型预下载 + `hf-cache` 命名卷新建为空 + `embedder.py:15` 先试本地缓存、`:18` 回落联网。
 - **复现**：`docker compose up -d` 后上传 PDF，`GET /api/papers/{id}` → `failed`；`docker compose exec ai-service ls /root/.cache/huggingface` 为空；本机能跑只因卷里已有 4.3G 模型。
 - **影响**：主链断在解析，演示第 3 步之后不可用。
 - **附加风险**：`main.py:32` 预热失败不阻塞启动，容器恒定显示 healthy 而模型不可用——**`docker compose ps` 全绿不代表能用**；需给 `/internal/health` 增加 `model_ready` 字段并以其判 healthcheck。
+- **处置（D13 站会，2026-11-08）**：**接受风险、不修**。理由：答辩与测试统一使用 P1 笔记本，其 `hf-cache` 卷内已含 4.3 GB 模型。
+- **前提（必须遵守）**：**不清卷、不换目录**——compose 项目名随目录变化会新建空卷，届时模型又会缺失；`docker compose down -v` 同样会删卷。
+- **后果**：干净环境（新机器 / 新目录 / 清卷后）首次上传必失败；换机演示前需先拷模型或预热。
 
-### BUG-013 · nginx 不认 `.mjs`，阅读页白屏（S1 · P6 · 待修复）
+### BUG-013 · nginx 不认 `.mjs`，阅读页白屏（S1 · P6 · 已修复）
 - **版本**：`master`（容器化）
 - **现象**：`pdf_worker_min-*.mjs` 被 nginx 以 `application/octet-stream` 返回，浏览器按 ES 模块规范拒绝执行，pdf.js 降级 fake worker 后渲染失败。nginx 1.31.8 的 `mime.types` 只有 `js`、没有 `mjs`，落到 `default_type`。
 - **复现**：容器起全栈后打开任意论文阅读页；`curl -I http://localhost:8081/assets/pdf.worker.min-*.mjs` → `200 / application/octet-stream`；F12 Console 报 `Expected a JavaScript module script but the server responded with a MIME type of "application/octet-stream"`；同一 id 的 `/file` 接口返回 200 / `application/pdf`。
 - **影响**：容器环境阅读链路整体不可用（F2 组不可演示）；前端提示误报「无法连接到服务器」（文案问题并入本条）。
-- **修法**：`frontend/nginx.conf` 加 `types { application/javascript mjs; }`，**前端代码零改动**；与开发期走 Vite 代理无关。
+- **修法**：`frontend/nginx.conf` 加 `include mime.types` + `types { application/javascript mjs; }`，**前端代码零改动**（`50fa38e`，合并提交 `e451dd9`）。
+- **复测（2026-11-08）**：`frontend/nginx.conf` 已含 `mjs`；8081 打开论文阅读页正常渲染，Console 无 `non-JavaScript MIME type` 报错。
 
 ### BUG-015 · `file_path` 存绝对路径，换环境读不到（S2 · P4 · 已修复）
 - **版本**：`master`（容器化）
