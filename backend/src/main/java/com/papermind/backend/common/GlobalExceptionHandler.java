@@ -18,8 +18,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BizException.class)
     public ResponseEntity<ApiResponse<Void>> handleBiz(BizException e) {
         ErrorCode ec = e.getErrorCode();
+        String message = (e.getMessage() == null || e.getMessage().isBlank())
+            ? ec.getMessage() : e.getMessage();
         return ResponseEntity.status(ec.getHttpStatus())
-            .body(ApiResponse.fail(ec.getCode(), ec.getMessage()));
+            .body(ApiResponse.fail(ec.getCode(), message));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
