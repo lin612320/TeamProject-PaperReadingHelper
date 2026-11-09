@@ -42,7 +42,15 @@ docker compose logs -f backend
 >
 > 问答需要 DeepSeek Key：在仓库根目录执行 `cp ai-service/.env.example .env`，填好 `DEEPSEEK_API_KEY`，再 `docker compose up -d`（compose 会自动读取根目录 `.env`）。不填也能起，但提问会报「未配置 DEEPSEEK_API_KEY」。
 >
-> 改过 SQL 必须 `docker compose down -v` 才生效。
+> 改过 `docs/03-数据库表结构.sql` 后，**不要用 `docker compose down -v` 让它生效** —— `-v` 会连 `hf-cache`（2.2GB 向量模型）和 `uploads`（已上传的 PDF）一起删掉，模型没了就要重新联网下载，演示环境直接废掉。
+>
+> 正确做法二选一：
+>
+> - **给已有库补列**（推荐，幂等）：把 DDL 里新增的那条 `ALTER TABLE ...` 直接在库里执行一次，例如
+>   `docker compose exec -T postgres psql -U papermind -d papermind -c "ALTER TABLE chunks ADD COLUMN IF NOT EXISTS bbox_mode TEXT;"`
+> - **确实要重建库**：只删数据卷，别动其它卷 ——
+>   `docker compose stop postgres && docker volume rm papermind_pgdata && docker compose up -d postgres`
+>   （库里的论文记录会清空，需要重新上传）
 
 ## 常见问题
 
