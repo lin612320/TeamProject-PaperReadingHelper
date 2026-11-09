@@ -103,6 +103,12 @@ CREATE TABLE IF NOT EXISTS chunks (
     bbox_x1           DOUBLE PRECISION CHECK (bbox_x1 BETWEEN 0 AND 1),
     bbox_y1           DOUBLE PRECISION CHECK (bbox_y1 BETWEEN 0 AND 1),
 
+    -- ↓ 2026-11-08 新增（契约 1.1.0 / #40 #41）：bbox 的精度来源
+    --   precise = 单栏正文，框对应原句所在块，前端可画细框
+    --   block   = 双栏或版面复杂，框是整段范围，前端不得当作逐句精确定位
+    --   NULL    = 无坐标，前端退回「只跳页不画框」
+    bbox_mode         TEXT CHECK (bbox_mode IN ('precise', 'block')),
+
     -- 向量列：**维度必须与 embedding 模型一致**
     -- 当前约定 1024 维（bge-m3）。换模型必须重建整列 + 重新解析所有论文。
     embedding         vector(1024),
@@ -116,7 +122,15 @@ CREATE TABLE IF NOT EXISTS chunks (
 COMMENT ON TABLE  chunks            IS '论文切片与向量，RAG 检索的数据源';
 COMMENT ON COLUMN chunks.page       IS '所在页码，从 1 开始，前端据此跳转';
 COMMENT ON COLUMN chunks.bbox_x0    IS '引用框左上 x，归一化 0~1；Alpha 为 NULL，Beta 填充';
+COMMENT ON COLUMN chunks.bbox_mode  IS 'bbox 精度来源：precise=逐句块，block=整段降级；NULL=无坐标';
 COMMENT ON COLUMN chunks.embedding  IS '向量，维度必须等于 1024（与 bge-m3 一致），换模型需重建';
+
+-- ────────────────────────────────────────────────────────────
+-- 存量库迁移（2026-11-08，契约 1.1.0 起 bbox_mode 启用）
+--   ⚠️ 只改本文件不会影响已经建好的库，必须在存量库上单独执行一次
+--   取值由应用层（chunker）保证，约束仅为兜底，故迁移时不搬 CHECK
+-- ────────────────────────────────────────────────────────────
+-- ALTER TABLE chunks ADD COLUMN IF NOT EXISTS bbox_mode TEXT;
 
 -- 按论文过滤后再做向量检索，这条是必备索引
 CREATE INDEX IF NOT EXISTS idx_chunks_paper

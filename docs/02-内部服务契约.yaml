@@ -400,7 +400,7 @@ components:
           format: int64
           nullable: true
           description: chunks 表主键，便于追溯
-        # ↓ 以下四个 Alpha 阶段必须返回 null，Beta 阶段由 P5 填入真实值
+        # ↓ 2026-11-08 起（对外契约 1.1.0）这四项不再强制 null，由 P5 回填真实坐标
         bboxX0:
           type: number
           nullable: true
@@ -414,6 +414,16 @@ components:
         bboxY1:
           type: number
           nullable: true
+        bboxMode:
+          type: string
+          nullable: true
+          enum: [precise, block]
+          description: |
+            bbox 的精度来源（1.1.0 新增）：
+            - precise = 单栏正文，框对应原句所在块
+            - block   = 双栏或版面复杂，框是整段范围，前端不得当逐句精确定位
+            - null    = 无坐标，前端退回「只跳页不画框」
+            P4 原样透传，不得改写或丢弃。
 
 # ============================================================================
 # 双方各自要做的验收
