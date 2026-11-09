@@ -44,6 +44,34 @@ docker compose logs -f backend
 >
 > 改过 SQL 必须 `docker compose down -v` 才生效。
 
+## 常见问题
+
+**1. 断网 / 镜像拉取失败**
+
+首次启动需要从 Docker Hub 拉取基础镜像（postgres、redis 等）。网络不通时会看到：
+
+```
+failed to resolve reference "docker.io/pgvector/pgvector:pg16":
+failed to do request: Head "https://registry-1.docker.io/v2/...": EOF
+```
+
+处理办法：
+
+- **有网时先预拉**：`docker compose pull`，成功后再 `docker compose up -d`
+- **完全离线**：在有网机器上 `docker compose build`，用 `docker save` 导出镜像、`docker load` 导入
+- **注意**：镜像已在本地时，断网不影响启动（`docker compose up -d` 仍可起全栈），只有拉取新镜像才会失败
+
+**2. 上传后解析一直失败（EMBEDDING_FAILED）**
+
+容器内没有 embedding 模型时，上传后会提示向量化失败。首次需将宿主机 `~/.cache/huggingface` 下的 `bge-m3` 拷入 `hf-cache` 卷，详见 `docs/测试/BugList.md` 的 BUG-012。
+
+```powershell
+docker run --rm `
+  -v "$env:USERPROFILE\.cache\huggingface:/host:ro" `
+  -v teamproject-paperreadinghelper_hf-cache:/data `
+  redis:7-alpine sh -c "cp -a /host/. /data/"
+```
+
 ## 分支规范（双分支）
 
 | 分支 | 职责 | 谁能动 |
