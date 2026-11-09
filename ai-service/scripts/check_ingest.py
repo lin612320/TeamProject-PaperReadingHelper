@@ -63,13 +63,62 @@ def main():
             row = cur.fetchone()
             print("库中: 条数=%s, page=%s..%s" % row)
 
+            # bbox_mode 需要 P6 先加列；没加列时只校验 bbox_*
             cur.execute(
-                "select chunk_index, page, char_count, vector_dims(embedding) "
-                "from chunks where paper_id = %s order by chunk_index limit 3",
+                "select 1 from information_schema.columns "
+                "where table_name = 'chunks' and column_name = 'bbox_mode'"
+            )
+            has_bbox_mode = cur.fetchone() is not None
+
+            cur.execute(
+                "select count(*) from chunks where paper_id = %s and ("
+                "bbox_x0 is null or bbox_y0 is null or "
+                "bbox_x1 is null or bbox_y1 is null or "
+                "bbox_x0 < 0 or bbox_x1 > 1 or bbox_y0 < 0 or bbox_y1 > 1 or "
+                "bbox_x0 >= bbox_x1 or bbox_y0 >= bbox_y1)",
+                (paper_id,),
+            )
+            invalid_bbox = cur.fetchone()[0]
+            print("bbox 校验:", "PASS" if invalid_bbox == 0 else "FAIL（%d 条非法）" % invalid_bbox)
+
+            columns = (
+                "chunk_index, page, char_count, "
+                "bbox_x0, bbox_y0, bbox_x1, bbox_y1"
+            )
+            if has_bbox_mode:
+                columns = columns + ", bbox_mode"
+            columns = columns + ", vector_dims(embedding)"
+
+            cur.execute(
+                "select " + columns + " from chunks "
+                "where paper_id = %s order by chunk_index limit 3",
                 (paper_id,),
             )
             for r in cur.fetchall():
-                print("  chunk_index=%s page=%s 字数=%s 维度=%s" % r)
+                if has_bbox_mode:
+                    print(
+                        "  chunk_index=%s page=%s 字数=%s "
+                        "bbox=(%s,%s,%s,%s) mode=%s 维度=%s" % r
+                    )
+                else:
+                    print(
+                        "  chunk_index=%s page=%s 字数=%s "
+                        "bbox=(%s,%s,%s,%s) 维度=%s" % r
+                    )
+
+            if has_bbox_mode:
+                cur.execute(
+                    "select count(*) from chunks where paper_id = %s and ("
+                    "bbox_mode is null or bbox_mode not in ('precise','block'))",
+                    (paper_id,),
+                )
+                invalid_mode = cur.fetchone()[0]
+                print(
+                    "bbox_mode 校验:",
+                    "PASS" if invalid_mode == 0 else "FAIL（%d 条非法）" % invalid_mode,
+                )
+            else:
+                print("bbox_mode: 列不存在（P6 尚未加列，本次只写 bbox_*）")
 
     # 6. 清理测试数据（级联删除会带走 chunks）
     with get_connection() as conn:
