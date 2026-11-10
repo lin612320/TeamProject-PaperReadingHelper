@@ -308,6 +308,7 @@ const pageError = ref('')
 
 const question = ref('')
 const sending = ref(false)
+const questionInput = ref(null)
 
 const chatItems = ref([])
 
@@ -433,6 +434,11 @@ async function handleRetry(questionText) {
 onMounted(async () => {
   await loadPaper()
   await loadDocument()
+  if (route.query.focus === 'qa') {
+    nextTick(() => {
+      questionInput.value?.focus()
+    })
+  }
 })
 
 watch(
@@ -661,6 +667,7 @@ onBeforeUnmount(() => {
 
       <div class="qa-input-area">
         <textarea
+          ref="questionInput"
           v-model="question"
           class="qa-textarea"
           rows="2"
