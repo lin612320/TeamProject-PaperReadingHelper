@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: PaperMind API
-  version: 1.1.0-frozen
+  version: 1.2.0-frozen
   description: |
     PaperMind 论文阅读助手接口契约（**1.1.0 已冻结**，2026-11-08 由 P1 裁定；1.0.0 于 2026-10-24 冻结，变更须经 P1 并升版本号）。
 
@@ -154,6 +154,44 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiResponse"
 
+  /api/explain:
+    post:
+      tags: [qa]
+      summary: 划词翻译 / 术语解释（1.2.0 新增）
+      description: |
+        #42。只处理用户选中的那段文本，不传整篇论文。
+
+        - `paperId` 可空：未入库论文也支持，只是不查库内上下文
+        - `context` 可选：前端可从当前页截取少量上下文（服务端最多取 600 字）
+        - 选中文本超过 1000 字时服务端截断，响应 `truncated=true`
+        - 错误映射：INVALID_MODE / EMPTY_TEXT → 1001；LLM_TIMEOUT → 3002；LLM_AUTH_ERROR → 3003
+      operationId: explainText
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExplainRequest"
+      responses:
+        "200":
+          description: 翻译/解释结果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseExplainResult"
+        "400":
+          description: 参数错误或 API Key 无效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+        "504":
+          description: 大模型超时
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
   /api/search:
     get:
       tags: [search]
@@ -282,6 +320,14 @@ components:
           properties:
             data:
               $ref: "#/components/schemas/AskResult"
+
+    ApiResponseExplainResult:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/ExplainResult"
 
     ApiResponsePaperMetaList:
       allOf:
@@ -428,6 +474,56 @@ components:
           type: string
           example: deepseek-chat
 
+    ExplainRequest:
+      type: object
+      required: [text]
+      properties:
+        paperId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 可选；未入库论文不传，仍可翻译/解释
+        text:
+          type: string
+          minLength: 1
+          description: 选中文本；超过 1000 字服务端截断，响应 truncated=true
+        mode:
+          type: string
+          enum: [translate, term]
+          default: translate
+          description: translate=翻译；term=术语解释（解释第一句必须是白话定义）
+        context:
+          type: string
+          nullable: true
+          description: 可选；前端从当前页截取的上下文，服务端最多取 600 字
+        apiKey:
+          type: string
+          nullable: true
+          description: 可选；与 AskRequest.apiKey 相同，为空时用服务端 .env
+        baseUrl:
+          type: string
+          nullable: true
+        model:
+          type: string
+          nullable: true
+
+    ExplainResult:
+      type: object
+      required: [translation, explanation, mode, truncated]
+      properties:
+        translation:
+          type: string
+          description: 中文译文或中文术语；translate 模式必填
+        explanation:
+          type: string
+          description: 解释；term 模式第一句必须是白话定义
+        mode:
+          type: string
+          enum: [translate, term]
+        truncated:
+          type: boolean
+          description: 选中文本是否因超过 1000 字被截断
+
     PaperMeta:
       type: object
       description: 外部检索结果元数据（Beta）
@@ -485,6 +581,14 @@ x-conventions:
           3. Citation 增 bboxMode（precise / block / null），bbox 四字段由 null 改为真实填充
           4. 新增错误码 3003 AI_SERVICE_AUTH_ERROR（HTTP 400），替代此前误用的 2002
           5. 时间约定补充：必须返回带时区语义的 Asia/Shanghai 时间，禁止裸字符串
+      - version: 1.2.0
+        date: 2026-11-10
+        note: |
+          新增 POST /api/explain（#42 划词翻译 / 术语解释）：
+          1. paperId 可空：未入库论文也可翻译，只是不查库内上下文
+          2. context 可选：前端可传当前页少量上下文；服务端最多取 600 字
+          3. 选中文本超过 1000 字截断，响应 truncated=true
+          4. apiKey / baseUrl / model 与问答一致，为空时用服务端 .env
 
   pagination:
     page_starts_at: 1
