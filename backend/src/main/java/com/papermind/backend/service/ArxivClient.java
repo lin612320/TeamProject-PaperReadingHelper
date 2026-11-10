@@ -55,15 +55,40 @@ public class ArxivClient {
 
         log.info("arxiv search keyword={} start={} max={}", keyword, start, maxResults);
 
+        byte[] body = fetchWithRetry(url);
+        return parse(body);
+    }
+
+
+    private byte[] fetchWithRetry(String url) throws Exception {
+        int attempts = 2;
+        long perAttempt = Math.max(3, timeoutSeconds / attempts);   // 10 / 2 = 5 秒
+        Exception last = null;
+
+        for (int i = 1; i <= attempts; i++) {
+            try {
+                return fetchOnce(url, perAttempt);
+            } catch (java.net.http.HttpTimeoutException e) {
+                last = e;
+                log.warn("arxiv 请求超时 第{}次（每次{}秒）", i, perAttempt);
+            } catch (java.io.IOException e) {
+                last = e;
+                log.warn("arxiv 连接失败 第{}次：{}", i, e.toString());
+            }
+        }
+        throw last;   // 两次都失败 → 交给上层降级
+    }
+
+    private byte[] fetchOnce(String url, long timeoutSec) throws Exception {
         HttpClient client = HttpClient.newBuilder()
-            .version(HttpClient.Version.HTTP_1_1)   // 与内部服务一致，避免 HTTP/2 升级带来的问题
-            .connectTimeout(Duration.ofSeconds(3))
-            .followRedirects(HttpClient.Redirect.NORMAL)   // arXiv 可能 301，要能跟
+            .version(HttpClient.Version.HTTP_1_1)
+            .connectTimeout(Duration.ofSeconds(Math.min(3, timeoutSec)))
+            .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
 
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(url))
-            .timeout(Duration.ofSeconds(timeoutSeconds))
+            .timeout(Duration.ofSeconds(timeoutSec))
             .header("User-Agent", "PaperMind-Alpha/1.0 (course project)")
             .GET()
             .build();
@@ -74,8 +99,7 @@ public class ArxivClient {
         if (response.statusCode() != 200) {
             throw new IllegalStateException("arXiv 返回 HTTP " + response.statusCode());
         }
-
-        return parse(response.body());
+        return response.body();
     }
 
     private Result parse(byte[] xml) throws Exception {

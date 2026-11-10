@@ -46,6 +46,7 @@ public class SearchController {
 
         Map<String, Object> data = new HashMap<>();
         int start = (page - 1) * size;
+        boolean degraded = false;
 
         try {
             ArxivClient.Result result = arxivClient.search(keyword.trim(), start, size);
@@ -56,13 +57,18 @@ public class SearchController {
             throw new BizException(ErrorCode.INTERNAL_ERROR);
         } catch (java.net.http.HttpTimeoutException e) {
             log.warn("arxiv 检索超时 keyword={}", keyword, e);
+            degraded = true;
             data.put("total", 0);
             data.put("items", List.of());
         } catch (Exception e) {
             log.error("arxiv 检索失败 keyword={}", keyword, e);
+            degraded = true;
             data.put("total", 0);
             data.put("items", List.of());
         }
+
+        data.put("degraded", degraded);
+        data.put("cached", false);
 
         return ApiResponse.ok(data);
     }
