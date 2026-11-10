@@ -6,7 +6,6 @@ import socket
 import urllib.error
 import urllib.request
 from urllib.parse import urlparse
-
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -102,3 +101,6 @@ def chat(messages, timeout=DEFAULT_TIMEOUT, api_key=None, base_url=None, model=N
     if usage is None:
         usage = {}
     return answer, usage
+
+def chat_with_config(messages, config, timeout=DEFAULT_TIMEOUT):
+    return chat(messages,timeout=timeout,api_key=config.api_key,base_url=config.base_url,model=config.model)
