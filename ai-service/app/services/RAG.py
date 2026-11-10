@@ -35,6 +35,7 @@ def search_chunks(paper_id, question, top_k=3):
         with conn.cursor() as cur:
             cur.execute(
                 "select id, chunk_index, page, content, "
+                "bbox_x0, bbox_y0, bbox_x1, bbox_y1, bbox_mode, "
                 "1 - (embedding <=> %s::vector) as similarity "
                 "from chunks where paper_id = %s "
                 "order by embedding <=> %s::vector limit %s",
@@ -49,7 +50,12 @@ def search_chunks(paper_id, question, top_k=3):
             "chunk_index": row[1],
             "page": row[2],
             "content": row[3],
-            "similarity": float(row[4]),
+            "bbox_x0": row[4],
+            "bbox_y0": row[5],
+            "bbox_x1": row[6],
+            "bbox_y1": row[7],
+            "bbox_mode": row[8],
+            "similarity": float(row[9]),
         })
     return results
 
@@ -84,11 +90,12 @@ def _build_citations(chunks, max_citations):
             "page": chunk["page"],
             "snippet": snippet,
             "chunkId": chunk["chunk_id"],
-            # Alpha 阶段 bbox 一律返回 null
-            "bboxX0": None,
-            "bboxY0": None,
-            "bboxX1": None,
-            "bboxY1": None,
+            # #40：返回切片时写入的归一化 bbox 与精度模式；旧数据可为 null
+            "bboxX0": chunk.get("bbox_x0"),
+            "bboxY0": chunk.get("bbox_y0"),
+            "bboxX1": chunk.get("bbox_x1"),
+            "bboxY1": chunk.get("bbox_y1"),
+            "bboxMode": chunk.get("bbox_mode"),
         })
     return citations
 
