@@ -6,7 +6,7 @@ import psycopg
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from app.routers import paper, qa
+from app.routers import explain, paper, qa
 from app.services.embedder import get_model
 
 load_dotenv()
@@ -36,6 +36,7 @@ async def lifespan(app):
 app = FastAPI(title="PaperMind AI Service", lifespan=lifespan)
 app.include_router(paper.router)
 app.include_router(qa.router)
+app.include_router(explain.router)
 
 def check_db():
     conn = None
