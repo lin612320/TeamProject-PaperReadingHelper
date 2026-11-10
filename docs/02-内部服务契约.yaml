@@ -2,7 +2,7 @@
 # PaperMind · 内部服务契约（Spring Boot ↔ FastAPI）
 # ============================================================================
 # 谁和谁的约定：P4 刘万礼（Spring Boot，调用方） ↔ P5 吴啸天（FastAPI，被调用方）
-# 版本：1.0.1-frozen   冻结日期：2026-10-24 · 1.0.1 修订：2026-11-05（P1）
+# 版本：1.2.0-frozen   冻结日期：2026-10-24 · 1.2.0 修订：2026-11-10（#42,P5 pull request）
 #
 # 【它管什么】
 #   浏览器看不到这条链路。它只管「后端怎么让 AI 服务干活、AI 服务怎么把结果交回来」。
@@ -11,7 +11,7 @@
 # 【和对外契约的三点不同】
 #   1. 不套 {code, message, data} 那层壳 —— 内部直接返回业务对象
 #   2. 错误用 HTTP 状态码 + {code, message}，由 P4 翻译成对外错误码
-#   3. 不做鉴权（内网/本机调用），但必须校验 paperId 存在
+#   3. 不做鉴权（内网/本机调用）；问答必须校验 paperId 存在，翻译允许未入库
 #
 # 【三个约定】
 #   1. 页码 page 一律从 1 开始（1-based）
@@ -26,9 +26,9 @@ openapi: 3.0.3
 
 info:
   title: PaperMind Internal API (Spring Boot ↔ FastAPI)
-  version: 1.0.1-frozen
+  version: 1.2.0-frozen
   description: |
-    内部服务契约。P5 在 FastAPI 里实现下面 4 个接口，P4 在 Spring Boot 里调用。
+    内部服务契约。P5 在 FastAPI 里实现下面 5 个接口，P4 在 Spring Boot 里调用。
 
     端口约定：AI 服务本地跑 8000，docker 内为 http://ai-service:8000
 
@@ -284,7 +284,61 @@ paths:
                 $ref: "#/components/schemas/InternalError"
 
   # ==========================================================================
-  # 4. 删除论文的向量数据 —— P4 删 papers 时同步调用，避免孤儿数据
+  # 4. 划词翻译 / 术语解释（#42）
+  # ==========================================================================
+  /internal/explain:
+    post:
+      tags: [qa]
+      operationId: internalExplain
+      summary: 划词翻译 / 术语解释
+      description: |
+        #42。只处理用户选中的那段文本，不传整篇论文。
+
+        - `paperId` 可空：未入库论文也支持，只是不查库内上下文
+        - `context` 可选：前端可传当前页少量上下文，服务端最多取 600 字
+        - 选中文本超过 1000 字截断，响应 `truncated=true`
+        - 单次大模型调用上限 10 秒
+        - 不打印选中文本、上下文、apiKey
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExplainRequest"
+      responses:
+        "200":
+          description: 翻译/解释成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExplainResult"
+        "401":
+          description: 大模型鉴权失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalError"
+        "422":
+          description: 文本为空或 mode 非法
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalError"
+        "500":
+          description: 大模型调用失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalError"
+        "504":
+          description: 调用大模型超时
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalError"
+
+  # ==========================================================================
+  # 5. 删除论文的向量数据 —— P4 删 papers 时同步调用，避免孤儿数据
   # ==========================================================================
   /internal/papers/{paperId}:
     delete:
@@ -334,8 +388,11 @@ components:
             - PAPER_NOT_FOUND     # 论文不存在    → 对外 2001
             - PAPER_NOT_READY     # 还没解析完    → 对外 2002
             - EMPTY_QUESTION      # 问题为空      → 对外 2003
+            - EMPTY_TEXT          # 选中文本为空  → 对外 1001
+            - INVALID_MODE        # mode 非法     → 对外 1001
             - EMBEDDING_FAILED    # 向量化失败    → 对外 3001
             - LLM_ERROR           # 大模型报错    → 对外 3001
+            - LLM_AUTH_ERROR      # API Key 无效  → 对外 3003
             - LLM_TIMEOUT         # 大模型超时    → 对外 3002
             - INTERNAL_ERROR      # 其他          → 对外 5000
         message:
@@ -382,6 +439,57 @@ components:
               type: number
               example: 0.00244
               description: 本次调用估算花费（元）
+
+    # 划词翻译 / 术语解释请求（#42）
+    ExplainRequest:
+      type: object
+      required: [text]
+      properties:
+        paperId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 可选；未入库论文不传，仍可翻译/解释
+        text:
+          type: string
+          minLength: 1
+          description: 选中文本；超过 1000 字服务端截断，响应 truncated=true
+        mode:
+          type: string
+          enum: [translate, term]
+          default: translate
+        context:
+          type: string
+          nullable: true
+          description: 可选；前端从当前页截取的上下文，服务端最多取 600 字
+        apiKey:
+          type: string
+          nullable: true
+          description: 可选；与 /internal/qa/ask 相同，为空时用服务端 .env
+        baseUrl:
+          type: string
+          nullable: true
+        model:
+          type: string
+          nullable: true
+
+    # 划词翻译 / 术语解释返回（#42）
+    ExplainResult:
+      type: object
+      required: [translation, explanation, mode, truncated]
+      properties:
+        translation:
+          type: string
+          description: 中文译文或中文术语；translate 模式必填
+        explanation:
+          type: string
+          description: 解释；term 模式第一句必须是白话定义
+        mode:
+          type: string
+          enum: [translate, term]
+        truncated:
+          type: boolean
+          description: 选中文本是否因超过 1000 字被截断
 
     # 引用（注意与对外契约里的 Citation 保持一致，不要多一个字段少一个字段）
     Citation:
