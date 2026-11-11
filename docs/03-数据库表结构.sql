@@ -130,7 +130,7 @@ COMMENT ON COLUMN chunks.embedding  IS '向量，维度必须等于 1024（与 b
 --   ⚠️ 只改本文件不会影响已经建好的库，必须在存量库上单独执行一次
 --   取值由应用层（chunker）保证，约束仅为兜底，故迁移时不搬 CHECK
 -- ────────────────────────────────────────────────────────────
--- ALTER TABLE chunks ADD COLUMN IF NOT EXISTS bbox_mode TEXT;
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS bbox_mode TEXT;
 
 -- 按论文过滤后再做向量检索，这条是必备索引
 CREATE INDEX IF NOT EXISTS idx_chunks_paper
