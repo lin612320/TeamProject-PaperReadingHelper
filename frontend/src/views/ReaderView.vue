@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onBeforeUnmount, shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { getPaper, askQuestion } from '../api/papers'
+import { getPaper, askQuestion, explainText } from '../api/papers'
 import { useSettings } from '../composables/useSettings'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
@@ -45,6 +45,8 @@ function formatPdfError(error) {
 }
 
 const canvasEls = new Map()
+const textLayerEls = new Map()
+const textLayerTasks = new Map()
 const pdfLoading = ref(true)
 const pdfErrorMessage = ref('')
 const usingSample = ref(false)
@@ -85,6 +87,11 @@ function setCanvasEl(pageNumber, el) {
   else canvasEls.delete(pageNumber)
 }
 
+function setTextLayerEl(pageNumber, el) {
+  if (el) textLayerEls.set(pageNumber, el)
+  else textLayerEls.delete(pageNumber)
+}
+
 function setPageEl(pageNumber, el) {
   if (el) pageEls.set(pageNumber, el)
   else pageEls.delete(pageNumber)
@@ -115,6 +122,19 @@ async function renderAllPages({ resetProgress = true } = {}) {
   // 缩放重绘时不重置，避免整片画布闪白
   if (resetProgress) renderedPages.value = 0
 
+  // 重渲染前清除旧 text layer 任务和内容
+  textLayerTasks.forEach((t) => {
+    try {
+      t.cancel?.()
+    } catch {
+      // 忽略
+    }
+  })
+  textLayerTasks.clear()
+  textLayerEls.forEach((el) => {
+    if (el) el.textContent = ''
+  })
+
   try {
     for (let pageNumber = 1; pageNumber <= pdfDoc.value.numPages; pageNumber++) {
       const canvas = canvasEls.get(pageNumber)
@@ -133,6 +153,28 @@ async function renderAllPages({ resetProgress = true } = {}) {
       renderTasks.push(task)
       await task.promise
       renderedPages.value = pageNumber
+
+      // 渲染 text layer，让文字可选中
+      const textLayerEl = textLayerEls.get(pageNumber)
+      if (textLayerEl) {
+        const textContent = await page.getTextContent()
+        const textLayer = new pdfjsLib.TextLayer({
+          textContentSource: textContent,
+          container: textLayerEl,
+          viewport,
+        })
+        textLayerTasks.set(pageNumber, textLayer)
+        await textLayer.render()
+
+        // canvas 可能被 max-width:100% 缩放，让 text layer 跟随显示尺寸
+        // 通过设置 --total-scale-factor 让 pdfjs 自己计算容器尺寸和字体大小
+        const { pageWidth } = viewport.rawDims
+        requestAnimationFrame(() => {
+          // 用 clientWidth（不含 border），避免边框导致的偏移
+          const displayScale = canvas.clientWidth / pageWidth
+          textLayerEl.style.setProperty('--total-scale-factor', displayScale)
+        })
+      }
     }
   } catch (error) {
     const friendly = formatPdfError(error)
@@ -431,9 +473,152 @@ async function handleRetry(questionText) {
   }
 }
 
+// ===== #42 划词翻译 / 术语解释 =====
+const MAX_TEXT = 1000
+const MAX_CONTEXT = 600
+
+const selectedText = ref('')
+const selectionRange = ref(null)
+const explainBubbleVisible = ref(false)
+const explainBubbleStyle = ref({ top: '0px', left: '0px' })
+const explainPanelVisible = ref(false)
+const explainPanelStyle = ref({ top: '0px', left: '0px' })
+const explainLoading = ref(false)
+const explainMode = ref('translate')
+const explainResult = ref(null)
+const explainError = ref('')
+const explainTruncated = ref(false)
+const explainCopied = ref(false)
+
+function getSelectionContext() {
+  const sel = window.getSelection()
+  if (!sel || sel.rangeCount === 0 || !selectedText.value) return null
+
+  const range = sel.getRangeAt(0)
+  const container = range.commonAncestorContainer
+  const textLayerEl = container.nodeType === 1 ? container.closest('.text-layer') : container.parentElement?.closest('.text-layer')
+  if (!textLayerEl) return null
+
+  const fullText = textLayerEl.textContent || ''
+  const selText = selectedText.value
+  const idx = fullText.indexOf(selText)
+  if (idx === -1) return null
+
+  const half = Math.floor(MAX_CONTEXT / 2)
+  const start = Math.max(0, idx - half)
+  const end = Math.min(fullText.length, idx + selText.length + half)
+  return fullText.slice(start, end)
+}
+
+function handleSelection() {
+  if (explainLoading.value) return
+
+  const sel = window.getSelection()
+  const text = sel?.toString().trim() || ''
+
+  if (!text) {
+    explainBubbleVisible.value = false
+    return
+  }
+
+  // 只在 PDF 区域内的选区显示气泡
+  const anchorNode = sel.anchorNode
+  if (!anchorNode) return
+  const el = anchorNode.nodeType === 1 ? anchorNode : anchorNode.parentElement
+  if (!el?.closest('.text-layer')) return
+
+  selectedText.value = text.slice(0, MAX_TEXT)
+  selectionRange.value = sel.getRangeAt(0).cloneRange()
+
+  // 计算气泡位置（选区上方居中）
+  const rect = sel.getRangeAt(0).getBoundingClientRect()
+  const scrollRect = scrollContainer.value?.getBoundingClientRect()
+  if (!scrollRect) return
+
+  explainBubbleStyle.value = {
+    top: `${rect.top - scrollRect.top + scrollContainer.value.scrollTop - 40}px`,
+    left: `${rect.left - scrollRect.left + scrollContainer.value.scrollLeft + rect.width / 2 - 90}px`,
+  }
+  explainBubbleVisible.value = true
+}
+
+async function runExplain(mode) {
+  explainMode.value = mode
+  explainLoading.value = true
+  explainError.value = ''
+  explainResult.value = null
+  explainTruncated.value = false
+  explainBubbleVisible.value = false
+
+  // 浮层位置：选区下方
+  if (selectionRange.value) {
+    const rect = selectionRange.value.getBoundingClientRect()
+    const scrollRect = scrollContainer.value?.getBoundingClientRect()
+    if (scrollRect) {
+      explainPanelStyle.value = {
+        top: `${rect.bottom - scrollRect.top + scrollContainer.value.scrollTop + 8}px`,
+        left: `${Math.max(8, rect.left - scrollRect.left + scrollContainer.value.scrollLeft)}px`,
+      }
+    }
+  }
+  explainPanelVisible.value = true
+
+  try {
+    const aiConfig = isConfigured() ? settings.value : null
+    const context = getSelectionContext()
+    const data = await explainText(selectedText.value, mode, {
+      paperId: paperId || null,
+      context,
+      aiConfig,
+    })
+    explainResult.value = data
+    explainTruncated.value = data?.truncated === true
+  } catch (error) {
+    explainError.value = error.message || '解释请求失败'
+  } finally {
+    explainLoading.value = false
+  }
+}
+
+function retryExplain() {
+  runExplain(explainMode.value)
+}
+
+function copyExplainResult() {
+  if (!explainResult.value) return
+  const content = explainMode.value === 'translate'
+    ? explainResult.value.translation
+    : explainResult.value.explanation
+  if (!content) return
+  navigator.clipboard?.writeText(content).then(() => {
+    explainCopied.value = true
+    setTimeout(() => {
+      explainCopied.value = false
+    }, 1500)
+  })
+}
+
+function closeExplainPanel() {
+  explainPanelVisible.value = false
+  explainResult.value = null
+  explainError.value = ''
+  explainLoading.value = false
+  explainTruncated.value = false
+  explainCopied.value = false
+  window.getSelection()?.removeAllRanges()
+  selectedText.value = ''
+}
+
+function handleDocumentMouseUp(e) {
+  // 点击浮层/气泡内不处理
+  if (e.target.closest('.explain-bubble') || e.target.closest('.explain-panel')) return
+  nextTick(() => handleSelection())
+}
+
 onMounted(async () => {
   await loadPaper()
   await loadDocument()
+  document.addEventListener('mouseup', handleDocumentMouseUp)
   if (route.query.focus === 'qa') {
     nextTick(() => {
       questionInput.value?.focus()
@@ -452,6 +637,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  document.removeEventListener('mouseup', handleDocumentMouseUp)
   if (scrollRafId) {
     cancelAnimationFrame(scrollRafId)
     scrollRafId = 0
@@ -465,11 +651,20 @@ onBeforeUnmount(() => {
     }
   })
   renderTasks = []
+  textLayerTasks.forEach((t) => {
+    try {
+      t.cancel?.()
+    } catch {
+      // 忽略
+    }
+  })
+  textLayerTasks.clear()
   if (typeof pdfDoc.value?.destroy === 'function') {
     pdfDoc.value.destroy()
   }
   pdfDoc.value = null
   canvasEls.clear()
+  textLayerEls.clear()
 })
 </script>
 
@@ -582,6 +777,61 @@ onBeforeUnmount(() => {
               class="pdf-canvas"
               :class="{ 'is-rendered': n <= renderedPages }"
             ></canvas>
+            <div :ref="(el) => setTextLayerEl(n, el)" class="text-layer"></div>
+          </div>
+        </div>
+
+        <!-- 划词操作气泡 -->
+        <div
+          v-if="explainBubbleVisible"
+          class="explain-bubble"
+          :style="explainBubbleStyle"
+        >
+          <button class="explain-bubble-btn" @click.stop="runExplain('translate')">翻译</button>
+          <span class="explain-bubble-sep"></span>
+          <button class="explain-bubble-btn" @click.stop="runExplain('term')">解释</button>
+        </div>
+
+        <!-- 解释结果浮层 -->
+        <div
+          v-if="explainPanelVisible"
+          class="explain-panel"
+          :style="explainPanelStyle"
+          @click.stop
+        >
+          <div class="explain-panel-header">
+            <span class="explain-mode-tag">
+              {{ explainMode === 'translate' ? '翻译' : '术语解释' }}
+            </span>
+            <button class="explain-close-btn" @click.stop="closeExplainPanel" aria-label="关闭">×</button>
+          </div>
+
+          <p v-if="explainTruncated" class="explain-truncated-hint">
+            选中文本超过 1000 字，已截断处理
+          </p>
+
+          <div v-if="explainLoading" class="explain-loading">
+            <span class="spinner"></span>
+            <span>正在{{ explainMode === 'translate' ? '翻译' : '解释' }}…</span>
+          </div>
+
+          <div v-else-if="explainError" class="explain-error">
+            <p class="explain-error-text">{{ explainError }}</p>
+            <button class="btn-retry" @click.stop="retryExplain">重试</button>
+          </div>
+
+          <div v-else-if="explainResult" class="explain-result">
+            <p v-if="explainMode === 'translate'" class="explain-content">
+              {{ explainResult.translation }}
+            </p>
+            <p v-else class="explain-content">
+              {{ explainResult.explanation }}
+            </p>
+            <div class="explain-actions">
+              <button class="explain-copy-btn" @click.stop="copyExplainResult">
+                {{ explainCopied ? '已复制' : '复制' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -758,6 +1008,7 @@ onBeforeUnmount(() => {
 }
 
 .canvas-wrap {
+  position: relative;
   flex: 1;
   overflow-y: auto;
   padding: 16px 0;
@@ -779,6 +1030,7 @@ onBeforeUnmount(() => {
 }
 
 .page {
+  position: relative;
   line-height: 0;
 }
 
@@ -796,6 +1048,179 @@ onBeforeUnmount(() => {
 
 .pdf-canvas.is-rendered {
   opacity: 1;
+}
+
+/* text layer：覆盖在 canvas 上，文字透明可选 */
+.text-layer {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  overflow: hidden;
+  line-height: 1;
+  pointer-events: auto;
+  --total-scale-factor: 1;
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+}
+
+.text-layer :deep(span) {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  font-size: calc(var(--font-height, 0) * var(--total-scale-factor));
+  transform: scaleX(var(--scale-x, 1)) rotate(var(--rotate, 0deg));
+}
+
+.text-layer :deep(.markedContent) {
+  position: absolute;
+  inset: 0;
+}
+
+.text-layer :deep(::selection) {
+  background: rgb(59 130 246 / 30%);
+}
+
+/* ===== #42 划词翻译气泡 ===== */
+.explain-bubble {
+  position: absolute;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  background: #1e293b;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 20%);
+  padding: 2px;
+}
+
+.explain-bubble-btn {
+  padding: 6px 14px;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.explain-bubble-btn:hover {
+  background: #334155;
+}
+
+.explain-bubble-sep {
+  width: 1px;
+  height: 16px;
+  background: #475569;
+}
+
+/* ===== #42 解释结果浮层 ===== */
+.explain-panel {
+  position: absolute;
+  z-index: 50;
+  width: 340px;
+  max-width: calc(100% - 16px);
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgb(15 23 42 / 12%);
+  overflow: hidden;
+}
+
+.explain-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.explain-mode-tag {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2563eb;
+}
+
+.explain-close-btn {
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.explain-close-btn:hover {
+  color: #475569;
+}
+
+.explain-truncated-hint {
+  margin: 0;
+  padding: 8px 14px;
+  font-size: 12px;
+  color: #b45309;
+  background: #fef3c7;
+}
+
+.explain-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 14px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.explain-error {
+  padding: 16px 14px;
+  text-align: center;
+}
+
+.explain-error-text {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #dc2626;
+}
+
+.explain-result {
+  padding: 14px;
+}
+
+.explain-content {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #1e293b;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.explain-actions {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 10px;
+}
+
+.explain-copy-btn {
+  padding: 5px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.explain-copy-btn:hover {
+  border-color: #93b4f5;
+  color: #2563eb;
 }
 
 /* ===== #6 翻页 / 缩放 ===== */

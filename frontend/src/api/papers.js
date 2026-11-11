@@ -208,3 +208,46 @@ export async function importPaper(paperMeta) {
 
   return result.data
 }
+
+// 划词翻译 / 术语解释
+// mode: translate | term
+// 返回 { translation, explanation, mode, truncated }
+// aiConfig 可选，包含用户在设置页配置的 apiKey/baseUrl/model
+export async function explainText(text, mode = 'translate', { paperId = null, context = null, aiConfig = null } = {}) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 15000)
+
+  const payload = { text, mode }
+  if (paperId) payload.paperId = paperId
+  if (context) payload.context = context
+  if (aiConfig) {
+    payload.apiKey = aiConfig.apiKey
+    payload.baseUrl = aiConfig.baseUrl
+    payload.model = aiConfig.model
+  }
+
+  let response
+  let result
+  try {
+    response = await fetch(`${API_BASE}/api/explain`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    })
+    result = await response.json().catch(() => null)
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error('解释服务响应超时（>15s），请稍后重试')
+    }
+    throw formatApiError(error)
+  } finally {
+    clearTimeout(timeoutId)
+  }
+
+  if (!response.ok || !result || result.code !== 0) {
+    throw formatApiError(null, response, result)
+  }
+
+  return result.data
+}
