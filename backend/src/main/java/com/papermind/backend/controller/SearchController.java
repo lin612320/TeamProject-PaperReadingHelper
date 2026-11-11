@@ -18,7 +18,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 
 @RestController
@@ -26,6 +27,9 @@ import java.time.format.DateTimeFormatter;
 public class SearchController {
 
     private static final Logger log = LoggerFactory.getLogger(SearchController.class);
+
+    private static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
+    private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final ArxivClient arxivClient;
     private final StringRedisTemplate redis;
@@ -56,18 +60,16 @@ public class SearchController {
             throw new BizException(ErrorCode.INVALID_PARAM);
         }
 
-        String key = cacheKey(source, keyword.trim());
+        String key = cacheKey(source, keyword.trim(), page, size);
         int start = (page - 1) * size;
-        boolean degraded = false;
 
-        // 1. 先查缓存：命中直接返回，不联网
-        Map<String, Object> cachedData = readCache(key);
-        if (cachedData != null) {
-            return ApiResponse.ok(cachedData);
+        CachedHit hit = readCache(key);
+        if (hit != null) {
+            return ApiResponse.ok(hit.data, "离线缓存（更新时间 " + hit.cachedAt + "）");
         }
 
-        // 2. 缓存没有，调 arXiv
         Map<String, Object> data = new HashMap<>();
+        boolean degraded = false;
         try {
             ArxivClient.Result result = arxivClient.search(keyword.trim(), start, size);
             data.put("total", result.total);
@@ -90,31 +92,41 @@ public class SearchController {
 
         data.put("degraded", degraded);
         data.put("cached", false);
-        if (degraded) {
-            data.put("message", "外部数据源不可用");
-        }
 
+        if (degraded) {
+            return ApiResponse.ok(data, "外部数据源不可用，请稍后重试");
+        }
         return ApiResponse.ok(data);
     }
 
-
-    private String cacheKey(String source, String keyword) {
-        return "search:" + source + ":" + Integer.toHexString(keyword.hashCode());
+    private static class CachedHit {
+        Map<String, Object> data;
+        String cachedAt;
     }
 
-    private Map<String, Object> readCache(String key) {
+    private String cacheKey(String source, String keyword, int page, int size) {
+        return "search:" + source + ":" + Integer.toHexString(keyword.hashCode())
+            + ":p" + page + ":s" + size;
+    }
+
+    private CachedHit readCache(String key) {
         try {
             String json = redis.opsForValue().get(key);
             if (json == null) {
                 return null;
             }
-            Map<String, Object> cached = objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+            Map<String, Object> cached = objectMapper.readValue(
+                json, new TypeReference<Map<String, Object>>() {});
+
+            CachedHit hit = new CachedHit();
             Map<String, Object> data = new HashMap<>();
             data.put("total", cached.get("total"));
             data.put("items", cached.get("items"));
             data.put("cached", true);
-            data.put("message", "离线缓存（更新时间 " + cached.get("cachedAt") + "）");
-            return data;
+            data.put("degraded", false);
+            hit.data = data;
+            hit.cachedAt = cached.get("cachedAt") == null ? "未知" : String.valueOf(cached.get("cachedAt"));
+            return hit;
         } catch (Exception e) {
             log.warn("读缓存失败 key={}", key, e);
             return null;
@@ -126,11 +138,10 @@ public class SearchController {
             Map<String, Object> value = new HashMap<>();
             value.put("total", result.total);
             value.put("items", result.items);
-            value.put("cachedAt", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            value.put("cachedAt", ZonedDateTime.now(ZONE).format(TIME_FMT));
             redis.opsForValue().set(key, objectMapper.writeValueAsString(value), Duration.ofHours(24));
         } catch (Exception e) {
             log.warn("写缓存失败 key={}", key, e);
         }
     }
-
 }
