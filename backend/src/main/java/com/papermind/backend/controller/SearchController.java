@@ -4,6 +4,7 @@ import com.papermind.backend.common.ApiResponse;
 import com.papermind.backend.common.BizException;
 import com.papermind.backend.common.ErrorCode;
 import com.papermind.backend.service.ArxivClient;
+import com.papermind.backend.service.OpenAlexClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,13 +33,16 @@ public class SearchController {
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final ArxivClient arxivClient;
+    private final OpenAlexClient openAlexClient;
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
 
     public SearchController(ArxivClient arxivClient,
+                            OpenAlexClient openAlexClient,
                             StringRedisTemplate redis,
                             ObjectMapper objectMapper) {
         this.arxivClient = arxivClient;
+        this.openAlexClient = openAlexClient;
         this.redis = redis;
         this.objectMapper = objectMapper;
     }
@@ -56,7 +60,7 @@ public class SearchController {
         if (page < 1 || size < 1 || size > 50) {
             throw new BizException(ErrorCode.INVALID_PARAM);
         }
-        if (!"arxiv".equals(source)) {
+        if (!"arxiv".equals(source) && !"openalex".equals(source)) {
             throw new BizException(ErrorCode.INVALID_PARAM);
         }
 
@@ -71,10 +75,17 @@ public class SearchController {
         Map<String, Object> data = new HashMap<>();
         boolean degraded = false;
         try {
-            ArxivClient.Result result = arxivClient.search(keyword.trim(), start, size);
-            data.put("total", result.total);
-            data.put("items", result.items);
-            writeCache(key, result);
+            if ("openalex".equals(source)) {
+                OpenAlexClient.Result result = openAlexClient.search(keyword.trim(), page, size);
+                data.put("total", result.total);
+                data.put("items", result.items);
+                writeCache(key, result.total, result.items);
+            } else {
+                ArxivClient.Result result = arxivClient.search(keyword.trim(), start, size);
+                data.put("total", result.total);
+                data.put("items", result.items);
+                writeCache(key, result.total, result.items);
+            }
         } catch (IllegalArgumentException e) {
             log.error("arxiv URL 非法 keyword={}", keyword, e);
             throw new BizException(ErrorCode.INTERNAL_ERROR);
@@ -116,7 +127,8 @@ public class SearchController {
                 return null;
             }
             Map<String, Object> cached = objectMapper.readValue(
-                json, new TypeReference<Map<String, Object>>() {});
+                json, new TypeReference<Map<String, Object>>() {
+                });
 
             CachedHit hit = new CachedHit();
             Map<String, Object> data = new HashMap<>();
@@ -133,11 +145,11 @@ public class SearchController {
         }
     }
 
-    private void writeCache(String key, ArxivClient.Result result) {
+    private void writeCache(String key, int total, List<Map<String, Object>> items) {
         try {
             Map<String, Object> value = new HashMap<>();
-            value.put("total", result.total);
-            value.put("items", result.items);
+            value.put("total", total);
+            value.put("items", items);
             value.put("cachedAt", ZonedDateTime.now(ZONE).format(TIME_FMT));
             redis.opsForValue().set(key, objectMapper.writeValueAsString(value), Duration.ofHours(24));
         } catch (Exception e) {
