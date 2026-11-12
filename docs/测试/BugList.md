@@ -1,7 +1,8 @@
 # Alpha Bug List
 
-> P7 李义朋 · [#25](https://github.com/lin612320/TeamProject-PaperReadingHelper/issues/25) · v1.2 · 2026-11-11 · 测试版本 `master`（容器化）
+> P7 李义朋 · [#25](https://github.com/lin612320/TeamProject-PaperReadingHelper/issues/25) · **v1.3 · 2026-11-12** · 测试版本 `master`（容器化）
 > 版式：概览表（5 列，一屏可读）+ 每条明细分块。
+> **状态：18 条 · 已修复 17 · 不修复 1（BUG-012，接受风险）· 待修复 0**（最近一次复测：2026-11-12，BUG-017/018/019 均已关闭）
 
 ## 概览
 
@@ -23,8 +24,8 @@
 | BUG-015 | S2  | P4        | 已修复       | `file_path` 存绝对路径，换环境读不到                                              |
 | BUG-016 | S1  | P4        | 已修复       | `apiKey` 未转发，用户 Key 不生效                                               |
 | BUG-017 | S1  | P4        | 已修复       | `/api/search` 降级时缺 `degraded` / `cached` 标记，前端无法区分“没结果”与“网断了”         |
-| BUG-018 | S2  | P6        | 已修复       | 检索命中缓存时 `message` 里的更新时间用 UTC，比北京时间慢 8 小时                             |
-| BUG-019 | S0  | P6        | 已修复       | `chunks.bbox_mode` 列未创建，`RAG.py` 查询报错 → `/api/qa/ask` 全部 3001，问答主链不可用 |
+| BUG-018 | S2  | P6        | 已修复 | 检索命中缓存时 `message` 里的更新时间用 UTC，比北京时间慢 8 小时                             |
+| BUG-019 | S0  | P6        | 已修复 | `chunks.bbox_mode` 列未创建，`RAG.py` 查询报错 → `/api/qa/ask` 全部 3001，问答主链不可用 |
 
 **统计**：18 条 · 已修复 17 · 不修复 1（BUG-012，接受风险）· 待修复 0
 
@@ -209,8 +210,9 @@
 - **根因**：`SearchController.writeCache()` 用 `LocalDateTime.now()` 取 JVM 默认时区，容器内为 UTC；与 BUG-011（上传时间差 8 小时）同类。
 - **影响**：用户看到“更新于 08:02”，会误以为缓存是 8 小时前的旧数据，从而反复刷新，抵消缓存的意义。
 - **修法**：改用 `LocalDateTime.now(ZoneId.of("Asia/Shanghai"))`，或统一在容器注入 `TZ=Asia/Shanghai`。
+- **修复**：`510a874`（11-11 11:53，P4）缓存时间改用 `ZonedDateTime.now(ZoneId.of("Asia/Shanghai"))`，提示从 `data.message` 移到**顶层 `message`**，缓存 key 按分页隔离。
+- **复测（2026-11-12）**：搜两次同词，第二次顶层 `message` = 「离线缓存（更新时间 2026-11-12 18:58:18）」，与本机时间 18:58:18 **偏差 0 分钟**；`cached=true`、`degraded=false`，通过。
 - **关联用例**：F5-07
-- **复测（2026-11-11）**：清缓存后重搜 `transformer`，命中缓存返回 `message`＝`离线缓存（更新时间 2026-11-11 20:10:56）`，与北京时间一致（当时 20:10），不再慢 8 小时，通过。
 
 ---
 
@@ -224,7 +226,8 @@
 - **影响**：**问答主链路完全不可用**（所有论文、所有问题均 3001），且前端只显示“AI 服务调用失败”，难以定位。
 - **修法**：执行迁移 `ALTER TABLE chunks ADD COLUMN IF NOT EXISTS bbox_mode TEXT CHECK (bbox_mode IN ('precise','block'));`；并把 `docs/03` 中的迁移语句从注释改为正式部署步骤，启动自检增加列检查。
 - **关联用例**：F6-01/02/03/05（全部测不了）、F5-10（复测受影响）
-- **复测（2026-11-11）**：执行 `ALTER TABLE chunks ADD COLUMN IF NOT EXISTS bbox_mode TEXT` 后，`chunks` 表 14 列、含 `bbox_mode`；原报 `UndefinedColumn` 的 `SELECT ... bbox_mode ...` 已可正常执行，SQL 层不再 3001，通过。
+- **修复**：`e7b8203`（11-11 12:22，P6）将 `docs/03:133` 的迁移语句从注释转正；测试环境执行 `ALTER TABLE chunks ADD COLUMN IF NOT EXISTS bbox_mode TEXT CHECK (bbox_mode IN ('precise','block'));` 后列已存在。
+- **复测（2026-11-12）**：对 paperId=53 提问返回 `code=0`，`citations[].bboxX0~Y1` 有 0–1 归一化数值，ai-service 日志无 `UndefinedColumn`；`bboxMode` 为 null（该论文解析于补列前，属预期，需重新解析后才能验证 mode）。
 
 ---
 
@@ -237,5 +240,5 @@
 - BUG-014（前端把 worker 加载失败显示成「无法连接到服务器」）与 BUG-013 同源，已并入 BUG-013 的影响，不单列，故跳过 014。
 - BUG-016 为 API Key 未转发（由 P1 并入本表）。
 - BUG-017 为 `/api/search` 降级缺 `degraded` 标记（2026-11-10 发现，`8dd04db` 修复，11-11 复测通过）。
-- BUG-018 为检索缓存提示时间用 UTC（2026-11-11 发现，已修复）。
-- BUG-019 为 `chunks.bbox_mode` 列未创建导致问答全 3001（2026-11-11 发现，S0，已修复）。
+- BUG-018 为检索缓存提示时间用 UTC（2026-11-11 发现，待修复）。
+- BUG-019 为 `chunks.bbox_mode` 列未创建导致问答全 3001（2026-11-11 发现，S0，待修复）。
