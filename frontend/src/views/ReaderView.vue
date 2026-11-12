@@ -192,6 +192,7 @@ async function loadDocument() {
   renderedPages.value = 0
   currentPage.value = 1
   pageInput.value = 1
+  clearCitationHighlight()
 
   try {
     pdfDoc.value = await openDocument()
@@ -274,24 +275,86 @@ function commitPageInput() {
 const flashPageNumber = ref(0)
 let flashTimer = 0
 
+// ===== #41 引用 bbox 高亮层 =====
+const citationHighlight = ref(null)
+let citationHighlightTimer = 0
+let citationHighlightSeq = 0
+
 /** 页码是否有效（1..pageCount），防止后端脏数据导致跳转异常 */
 function isValidPage(page) {
   const n = Number(page)
   return Number.isFinite(n) && n >= 1 && n <= pageCount.value
 }
 
-/** 点击引用页码：跳到对应页，并短暂高亮该页 */
-function jumpToCitation(page) {
-  if (!isValidPage(page)) return
+/**
+ * 把 citation 的归一化 bbox 转成相对页面的 CSS 百分比。
+ * 无效 / 四字段为 null / 面积过小 → 返回 null，调用方退回“只跳页不画框”。
+ */
+function citationBoxStyle(cite) {
+  if (!cite) return null
 
-  const target = Number(page)
-  goToPage(target)
+  const raw = [cite.bboxX0, cite.bboxY0, cite.bboxX1, cite.bboxY1]
+  if (raw.some((v) => v === null || v === undefined || v === '')) return null
 
-  flashPageNumber.value = target
+  const values = raw.map(Number)
+  if (!values.every(Number.isFinite)) return null
+
+  const left = Math.max(0, Math.min(1, Math.min(values[0], values[2])))
+  const top = Math.max(0, Math.min(1, Math.min(values[1], values[3])))
+  const right = Math.max(0, Math.min(1, Math.max(values[0], values[2])))
+  const bottom = Math.max(0, Math.min(1, Math.max(values[1], values[3])))
+
+  if (right - left < 0.002 || bottom - top < 0.002) return null
+
+  return {
+    left: `${left * 100}%`,
+    top: `${top * 100}%`,
+    width: `${(right - left) * 100}%`,
+    height: `${(bottom - top) * 100}%`,
+  }
+}
+
+function clearCitationHighlight() {
+  clearTimeout(citationHighlightTimer)
+  citationHighlightTimer = 0
+  citationHighlight.value = null
+}
+
+/** bboxMode=null 时的降级：只闪一下目标页，不画框 */
+function flashPage(page) {
+  flashPageNumber.value = page
   clearTimeout(flashTimer)
   flashTimer = setTimeout(() => {
     flashPageNumber.value = 0
   }, 1200)
+}
+
+/** 点击引用：跳页 + 画半透明 bbox 框；无坐标时只跳页 */
+function jumpToCitation(cite) {
+  if (!cite || !isValidPage(cite.page)) return
+
+  const target = Math.floor(Number(cite.page))
+  goToPage(target)
+  clearCitationHighlight()
+
+   const style = citationBoxStyle(cite)
+  if (!style) {
+    flashPage(target)
+    return
+  }
+
+  citationHighlight.value = {
+    page: target,
+    style,
+    // precise = 单栏细框；block = 双栏/复杂版面的整段框，用虚线区分
+    mode: cite.bboxMode === 'block' ? 'block' : 'precise',
+    key: ++citationHighlightSeq,
+  }
+
+  // 2.8 秒后移除；快速连点会先清掉上一个 timer
+  citationHighlightTimer = setTimeout(() => {
+    citationHighlight.value = null
+  }, 2800)
 }
 
 // 缩放前记录「当前页 + 页内偏移比例」，重绘后滚回同一位置 
@@ -643,6 +706,7 @@ onBeforeUnmount(() => {
     scrollRafId = 0
   }
   clearTimeout(flashTimer)
+  clearCitationHighlight()
   renderTasks.forEach((task) => {
     try {
       task.cancel()
@@ -778,6 +842,19 @@ onBeforeUnmount(() => {
               :class="{ 'is-rendered': n <= renderedPages }"
             ></canvas>
             <div :ref="(el) => setTextLayerEl(n, el)" class="text-layer"></div>
+            <!-- #41 引用 bbox 高亮层：百分比定位，随缩放/旋转页自动对齐 -->
+            <div
+              v-if="citationHighlight && citationHighlight.page === n"
+              :key="citationHighlight.key"
+              class="citation-highlight-layer"
+              aria-hidden="true"
+            >
+              <div
+                class="citation-highlight"
+                :class="{ 'is-block': citationHighlight.mode === 'block' }"
+                :style="citationHighlight.style"
+              ></div>
+            </div>
           </div>
         </div>
 
@@ -894,7 +971,7 @@ onBeforeUnmount(() => {
                     class="citation-page"
                     :disabled="!pageCount || pdfLoading || !isValidPage(cite.page)"
                     :title="`跳转到第 ${cite.page} 页`"
-                    @click="jumpToCitation(cite.page)"
+                    @click="jumpToCitation(cite)"
                   >
                     第 {{ cite.page }} 页
                   </button>
@@ -1081,6 +1158,60 @@ onBeforeUnmount(() => {
 
 .text-layer :deep(::selection) {
   background: rgb(59 130 246 / 30%);
+}
+
+/* ===== #41 引用 bbox 高亮层 ===== */
+.citation-highlight-layer {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: calc(100% - 2px);
+  height: calc(100% - 2px);
+  z-index: 15;
+  pointer-events: none;
+}
+
+.citation-highlight {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid #f59e0b;
+  border-radius: 3px;
+  background: rgb(245 158 11 / 18%);
+  box-shadow: 0 0 0 2px rgb(245 158 11 / 12%);
+  animation: citation-highlight-fade 2.6s ease-out forwards;
+}
+
+/* 双栏/复杂版面：bboxMode=block，用虚线提示“整段范围”，不冒充逐句精确 */
+.citation-highlight.is-block {
+  border-color: #2563eb;
+  border-style: dashed;
+  background: rgb(37 99 235 / 14%);
+  box-shadow: 0 0 0 2px rgb(37 99 235 / 10%);
+}
+
+@keyframes citation-highlight-fade {
+  0% { opacity: 0; }
+  8% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* bboxMode=null：契约要求“只跳页不画框”，这里只闪一下目标页 */
+.page-flash::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 14;
+  border: 2px solid rgb(37 99 235 / 55%);
+  border-radius: 4px;
+  pointer-events: none;
+  animation: page-flash-fade 1.1s ease-out forwards;
+}
+
+@keyframes page-flash-fade {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 /* ===== #42 划词翻译气泡 ===== */
