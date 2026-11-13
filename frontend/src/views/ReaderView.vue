@@ -537,7 +537,6 @@ async function handleRetry(questionText) {
 }
 
 // ===== #42 划词翻译 / 术语解释 =====
-const MAX_TEXT = 1000
 const MAX_CONTEXT = 600
 
 const selectedText = ref('')
@@ -590,7 +589,7 @@ function handleSelection() {
   const el = anchorNode.nodeType === 1 ? anchorNode : anchorNode.parentElement
   if (!el?.closest('.text-layer')) return
 
-  selectedText.value = text.slice(0, MAX_TEXT)
+  selectedText.value = text
   selectionRange.value = sel.getRangeAt(0).cloneRange()
 
   // 计算气泡位置（选区上方居中）
