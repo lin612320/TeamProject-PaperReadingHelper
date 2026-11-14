@@ -20,15 +20,16 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * 划词翻译 / 术语解释（契约 1.2.0 新增，对应 #42）。
- * 只做「校验 + 转发 + 错误码映射」，截断与 Prompt 都在 AI 服务侧。
- */
+
 @RestController
 @RequestMapping("/api/explain")
 public class ExplainController {
 
     private static final Logger log = LoggerFactory.getLogger(ExplainController.class);
+
+    private static final int MAX_TEXT = 1000;
+
+    private static final int MAX_CONTEXT = 600;
 
     @Value("${app.ai-service.url:http://localhost:8000}")
     private String aiServiceUrl;
@@ -39,12 +40,18 @@ public class ExplainController {
     @PostMapping
     public ApiResponse<Map<String, Object>> explain(@RequestBody Map<String, Object> body) {
 
-        String text = text(body.get("text"));                       // ① 必填
+        String text = text(body.get("text"));
         if (text.isEmpty()) {
             throw new BizException(ErrorCode.INVALID_PARAM, "选中文本不能为空");
         }
 
-        String mode = text(body.get("mode"));                       // ② 默认 translate
+        int textLength = text.length();
+        boolean truncatedByBackend = textLength > MAX_TEXT;
+        if (truncatedByBackend) {
+            text = text.substring(0, MAX_TEXT);
+        }
+
+        String mode = text(body.get("mode"));
         if (mode.isEmpty()) {
             mode = "translate";
         }
@@ -52,11 +59,11 @@ public class ExplainController {
             throw new BizException(ErrorCode.INVALID_PARAM, "mode 只能是 translate 或 term");
         }
 
-        Map<String, Object> req = new HashMap<>();                  // ③ 组装转发请求
+        Map<String, Object> req = new HashMap<>();
         req.put("text", text);
         req.put("mode", mode);
 
-        Object paperIdRaw = body.get("paperId");                    // ④ paperId 可选
+        Object paperIdRaw = body.get("paperId");
         if (paperIdRaw != null && !String.valueOf(paperIdRaw).trim().isEmpty()) {
             try {
                 req.put("paperId", Long.parseLong(String.valueOf(paperIdRaw).trim()));
@@ -65,7 +72,10 @@ public class ExplainController {
             }
         }
 
-        String context = text(body.get("context"));                 // ⑤ context 可选
+        String context = text(body.get("context"));
+        if (context.length() > MAX_CONTEXT) {
+            context = context.substring(0, MAX_CONTEXT);
+        }
         if (!context.isEmpty()) {
             req.put("context", context);
         }
@@ -76,11 +86,18 @@ public class ExplainController {
 
         Map<?, ?> aiResp = callAiService(req);
 
-        Map<String, Object> data = new HashMap<>();                 // ⑥ 只挑契约要求的四个字段
-        data.put("translation", aiResp.get("translation"));
-        data.put("explanation", aiResp.get("explanation"));
+        boolean truncated = truncatedByBackend
+            || Boolean.TRUE.equals(aiResp.get("truncated"));
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("translation", aiResp.get("translation") == null ? "" : aiResp.get("translation"));
+        data.put("explanation", aiResp.get("explanation") == null ? "" : aiResp.get("explanation"));
         data.put("mode", aiResp.get("mode") == null ? mode : aiResp.get("mode"));
-        data.put("truncated", aiResp.get("truncated") == null ? false : aiResp.get("truncated"));
+        data.put("truncated", truncated);
+
+        log.info("explain done textLen={} mode={} truncated={} paperId={}",
+            textLength, mode, truncated, req.get("paperId"));
+
         return ApiResponse.ok(data);
     }
 
