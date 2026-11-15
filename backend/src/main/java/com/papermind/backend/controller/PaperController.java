@@ -129,12 +129,9 @@ public class PaperController {
 
         jdbcTemplate.update("DELETE FROM papers WHERE id = ? AND user_id = 1", paperId);
 
-        if (storedPath != null) {
-            try {
-                Files.deleteIfExists(resolveFile(storedPath).toPath());
-            } catch (IOException ignored) {
-                // 删文件失败不影响数据库删除
-            }
+        try {
+            Files.deleteIfExists(resolveFile(storedPath).toPath());
+        } catch (IOException ignored) {
         }
 
         return ApiResponse.ok(null);
@@ -160,7 +157,6 @@ public class PaperController {
             throw new BizException(ErrorCode.FILE_NOT_PDF);
         }
 
-
         if (!isPdf(file)) {
             throw new BizException(ErrorCode.FILE_NOT_PDF);
         }
@@ -178,9 +174,10 @@ public class PaperController {
             throw new BizException(ErrorCode.STORAGE_ERROR);
         }
 
-        String title = (originalName.contains("."))
-            ? originalName.substring(0, originalName.lastIndexOf('.'))
-            : originalName;
+        String title = originalName.substring(0, originalName.length() - 4);
+        if (title.isBlank()) {
+            title = originalName;
+        }
 
         Long newId = jdbcTemplate.queryForObject(
             "INSERT INTO papers (title, filename, file_path, file_size_bytes, parse_status) "

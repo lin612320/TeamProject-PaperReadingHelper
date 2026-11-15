@@ -15,15 +15,10 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * 检索结果导入（契约 1.1.0 的 POST /api/papers/import）。
- * 职责：拿到 PaperMeta → 下载 OA 全文 → 建 papers 记录 → 触发异步解析 → 返回 paperId。
- */
 @Service
 public class PaperImportService {
 
@@ -43,10 +38,6 @@ public class PaperImportService {
         this.parseService = parseService;
     }
 
-    /**
-     * @param meta 前端把 /api/search 返回的 PaperMeta 原样回传
-     * @return 新（或已存在的）paperId
-     */
     public long importFromMeta(Map<String, Object> meta) {
         String title = text(meta.get("title"));
         String arxivId = normalizeArxivId(text(meta.get("arxivId")));
@@ -99,17 +90,21 @@ public class PaperImportService {
         }
 
         String filename = (arxivId.isEmpty() ? "imported" : arxivId) + ".pdf";
+        String source = arxivId.isEmpty() ? "import" : "arxiv";
+
         Long newId = jdbcTemplate.queryForObject(
             "INSERT INTO papers "
                 + "(title, filename, file_path, file_size_bytes, parse_status, source, arxiv_id, external_url, doi) "
-                + "VALUES (?, ?, ?, ?, 'pending', 'arxiv', ?, ?, ?) RETURNING id",
+                + "VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?) RETURNING id",
             Long.class,
             title, filename, savedName, pdf.length,
+            source,
             arxivId.isEmpty() ? null : arxivId,
             landingUrl.isEmpty() ? null : landingUrl,
             doi.isEmpty() ? null : doi);
 
-        log.info("import ok arxivId={} paperId={} size={}", arxivId, newId, pdf.length);
+        log.info("import ok arxivId={} paperId={} size={} source={}",
+            arxivId, newId, pdf.length, source);
 
         parseService.parseAsync(newId, target.getAbsolutePath());
         return newId;
