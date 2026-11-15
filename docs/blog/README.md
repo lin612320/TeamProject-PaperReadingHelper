@@ -7,8 +7,10 @@
 |---|---|---|---|
 | 第 6 周 | Alpha 冲刺第 6 周 Scrum Meeting 记录 | 2026-11-01 | https://www.cnblogs.com/7ICS/p/23514909.html |
 | 第 7 周 | Alpha 冲刺第 7 周 Scrum Meeting 记录 | 2026-11-08 | https://www.cnblogs.com/7ICS/p/23594426.html |
+| 第 8 周 | Alpha 阶段交付博客（迭代回顾 + 测试报告 + 软工原理） | 2026-11-15 | https://www.cnblogs.com/7ICS/p/23673452 |
 
 ## 备注
 
 - 每篇博客四要素：每人工作（含 Issue 链接）、燃尽图、例会照片、签入记录。
 - 第 6 周正文：`docs/blog/week6-scrum-meeting.md`；第 7 周正文：`docs/blog/week7-scrum-meeting.md`。
+- 第 8 周正文：`docs/blog/week8-scrum-meeting.md`（含三周汇总、测试报告与七条软工原理，即 Alpha 阶段交付博客）。
