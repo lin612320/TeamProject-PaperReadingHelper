@@ -26,6 +26,9 @@ public class OpenAlexClient {
     @Value("${app.search.timeout-seconds:10}")
     private long timeoutSeconds;
 
+    @Value("${app.search.openalex-mailto:}")     // 默认空，空就不带 mailto
+    private String openAlexMailto;
+
     public static class Result {
         public int total;
         public List<Map<String, Object>> items = new ArrayList<>();
@@ -35,8 +38,12 @@ public class OpenAlexClient {
         String url = openAlexUrl
             + "?search=" + URLEncoder.encode(keyword, StandardCharsets.UTF_8)
             + "&page=" + page
-            + "&per-page=" + size
-            + "&mailto=530944058@qq.com";
+            + "&per-page=" + size;
+
+        if (openAlexMailto != null && !openAlexMailto.isBlank()) {
+            url += "&mailto=" + URLEncoder.encode(openAlexMailto.trim(), StandardCharsets.UTF_8);
+        }
+
         log.info("openalex search keyword={} page={} size={}", keyword, page, size);
         return parse(fetchWithRetry(url));
     }
