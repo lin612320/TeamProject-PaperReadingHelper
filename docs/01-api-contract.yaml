@@ -1,9 +1,11 @@
 openapi: 3.0.3
 info:
   title: PaperMind API
-  version: 1.2.0-frozen
+  version: 1.3.0-frozen
   description: |
-    PaperMind 论文阅读助手接口契约（**1.1.0 已冻结**，2026-11-08 由 P1 裁定；1.0.0 于 2026-10-24 冻结，变更须经 P1 并升版本号）。
+    PaperMind 论文阅读助手接口契约（**1.3.0 于 2026-11-17 由 P1 拍板冻结**；沿用 1.0.0 的做法——先冻结、在 11-19 例会向全员通报，**不等回执**。1.0.0 于 2026-10-24、1.1.0 于 2026-11-08、1.2.0 于 2026-11-10 冻结，变更须经 P1 并升版本号）。
+
+    **1.3.0 包含**：auth 四接口（注册 / 登录 / 当前用户 / 登出）、`chunks.reading_order` 阅读顺序、`citations[].readingOrder`、划词低质输入拦截规则、越权口径（2001），以及新增错误码段 **6001–6003**。
 
     约定：
     - 所有响应统一包装为 ApiResponse，成功 code=0
@@ -20,14 +22,117 @@ servers:
     description: 本地后端（Spring Boot）
 
 tags:
+  - name: auth
+    description: 注册 / 登录 / 令牌（1.3.0 新增）
   - name: paper
     description: 文献上传与管理
   - name: qa
     description: 单篇精读问答
   - name: search
-    description: 关键词检索外部学术库（Beta 预留）
+    description: 关键词检索外部学术库（1.1.0 起实装）
 
 paths:
+  # ============================================================
+  # 1.3.0 新增：auth 四接口（#51）
+  # 约定：除注册/登录外，所有受保护接口都要带 Authorization: Bearer <token>
+  # ============================================================
+  /api/auth/register:
+    post:
+      tags: [auth]
+      summary: 注册（1.3.0 新增）
+      description: |
+        用户名唯一，密码以 **bcrypt** 入库（不落明文、不写日志、不回显）。
+        成功返回与登录同构的令牌，前端可直接进入已登录态。
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthRegisterRequest"
+      responses:
+        "200":
+          description: 注册成功并签发令牌
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseAuthToken"
+        "400":
+          description: 参数不合法，或用户名已被占用（6003）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+  /api/auth/login:
+    post:
+      tags: [auth]
+      summary: 登录（1.3.0 新增）
+      description: |
+        校验用户名与密码，成功签发 JWT。
+
+        **账号不存在与密码错误返回同一个错误码 6001**，不得让攻击者据此探测「该用户名是否存在」。
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthLoginRequest"
+      responses:
+        "200":
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseAuthToken"
+        "401":
+          description: 用户名或密码不正确（6001）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+  /api/auth/me:
+    get:
+      tags: [auth]
+      summary: 取当前登录用户（1.3.0 新增）
+      description: 前端启动时用它判断登录态是否还有效，避免刷新后先闪一下登录页。
+      operationId: currentUser
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 当前用户信息
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseUserInfo"
+        "401":
+          description: 未携带令牌、令牌过期或被篡改（6002）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+  /api/auth/logout:
+    post:
+      tags: [auth]
+      summary: 登出（1.3.0 新增）
+      description: |
+        无状态 JWT 下服务端不需要销毁令牌，本接口只做两件事：记一条登出日志、返回成功，由前端清除本地令牌。
+        若日后改 Redis 黑名单，语义不变，仅是服务端多一步。
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 登出成功（前端负责清除本地令牌）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
   /api/papers:
     post:
       tags: [paper]
@@ -266,6 +371,15 @@ paths:
                 $ref: "#/components/schemas/ApiResponse"
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        （1.3.0 新增）请求头 `Authorization: Bearer <token>`。
+        令牌由 `/api/auth/login` 或 `/api/auth/register` 签发；缺失、过期、签名被篡改一律按 6002 / HTTP 401 处理。
+
   parameters:
     PaperId:
       name: paperId
@@ -404,6 +518,16 @@ components:
           type: integer
           format: int64
           nullable: true
+        readingOrder:
+          type: integer
+          nullable: true
+          description: |
+            （1.3.0 新增）该引用所在 chunk 的页内阅读顺序，从 0 起，由 AI 服务按
+            `(band, column, y0, x0)` 排出（双栏页先读完左栏再读右栏）。
+
+            - **老数据可能为 null**，前端不得依赖此字段做定位，只作为排序与调试线索
+            - 定位仍以 `bboxX0/Y0/X1/Y1` + `page` 为准
+          example: 7
         bboxX0:
           type: number
           nullable: true
@@ -548,20 +672,94 @@ components:
           type: string
           nullable: true
 
+    # ---------------- 1.3.0 新增：auth 相关模型（#51） ----------------
+    AuthRegisterRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 32
+          pattern: "^[A-Za-z0-9_\\-]+$"
+          description: 仅字母、数字、下划线、连字符；唯一
+          example: linzihang
+        password:
+          type: string
+          minLength: 8
+          maxLength: 64
+          description: 明文只在传输中出现一次；服务端 bcrypt 后入库，**不得写入日志、不得回显**
+          example: "********"
+
+    AuthLoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, example: linzihang }
+        password: { type: string, example: "********" }
+
+    AuthToken:
+      type: object
+      required: [token, tokenType, expiresAt, user]
+      properties:
+        token:
+          type: string
+          description: JWT，前端保存并在后续请求的 Authorization 头中携带
+        tokenType:
+          type: string
+          enum: [Bearer]
+          default: Bearer
+        expiresAt:
+          type: string
+          format: date-time
+          description: 过期时间（Asia/Shanghai，带时区语义）；由服务端给出，前端不得自行推算
+        user:
+          $ref: "#/components/schemas/UserInfo"
+
+    UserInfo:
+      type: object
+      required: [id, username]
+      properties:
+        id: { type: integer, format: int64, example: 1 }
+        username: { type: string, example: linzihang }
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    ApiResponseAuthToken:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/AuthToken"
+
+    ApiResponseUserInfo:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/UserInfo"
+
 # ============================================================
 # 非 OpenAPI 标准字段，供团队对齐全队约定（评审重点）
 # ============================================================
 x-conventions:
   freeze:
     frozen_at: 2026-10-24
+    frozen_at_1_3_0: 2026-11-17
     review_gate: 2026-10-24 由 P1 林子航裁定提前冻结（未经集体评审，D1 站会向全员通报）
+    review_gate_1_3_0: |
+      2026-11-17 由 P1 拍板冻结，沿用 1.0.0 的先例：**先冻结、11-19 例会向全员通报，不等回执**。
+      冻结即生效——各组按本文件开工，发现与实现冲突时找 P1 升版本，不得私改本文件。
     change_policy: 冻结后任何字段增删改必须经 P1，并全员通知，同步更新本文件版本号
     version_rule:
       patch_1_0_x: 新增可选字段、补充注释、修正文案 —— 直接改，版本 +0.0.1，群里说一声
       minor_1_1_0: 新增接口、新增必填字段 —— 必须改，版本 +0.1.0，P1 通知全员并同步改前后端
       major_2_0_0: 删除/重命名字段、改语义（如页码起点） —— 禁止在 Alpha 内发生，只能进 Beta
     who_approves: P1 林子航（各组员不得私自改本文件）
-
     changelog:
       - version: 1.0.0
         date: 2026-10-24
@@ -589,6 +787,81 @@ x-conventions:
           2. context 可选：前端可传当前页少量上下文；服务端最多取 600 字
           3. 选中文本超过 1000 字截断，响应 truncated=true
           4. apiKey / baseUrl / model 与问答一致，为空时用服务端 .env
+      - version: 1.3.0-frozen
+        date: 2026-11-17
+        status: frozen（P1 拍板提前冻结，11-19 例会通报全员，**不等回执**）
+        note: |
+          Beta 第一周契约升级（#51 #52 #53），三项拍板结论已写入：
+          1. **越权口径 = 2001 + HTTP 404**（不采用 403，避免枚举他人文献）
+          2. **token 有效期 = 12 小时**
+          3. **不做刷新令牌**（记入 RC 备选）
+
+          具体改动：
+          1. **auth 四接口**：POST /api/auth/register、POST /api/auth/login、GET /api/auth/me、POST /api/auth/logout；新增 securitySchemes.bearerAuth
+          2. **错误码新开 6001–6003 段**：6001 用户名或密码不正确 / 6002 登录已失效 / 6003 用户名已被占用
+             ⚠️ **不能用 4001/4002**——4001 已被 STORAGE_ERROR 占用，这是本次发现并避开的冲突
+          3. **Citation 增 readingOrder**（页内阅读顺序，可空），配合 chunks.reading_order
+          4. **划词低质输入拦截规则**写入 explain_guard：空 / 长度<2 / 纯数字 → 前端不弹浮层
+          5. tags 中 search 的「Beta 预留」更正为「1.1.0 起实装」
+
+  # ↓↓↓ 1.3.0 新增：三条全队约定（#51 #52 #53） ↓↓↓
+  auth:
+    header: "Authorization: Bearer <token>"
+    issued_by: "POST /api/auth/register、POST /api/auth/login"
+    token_ttl_hours: 12
+    password_hash: bcrypt（cost 由实现定，最低 10）
+    invariants:
+      - 密码明文只在传输中出现一次，服务端**不落库、不写日志、不回显**
+      - 账号不存在与密码错误返回**同一个 6001**，不得泄露用户名是否存在
+      - 令牌过期 / 签名被篡改 → 6002 + HTTP 401，前端据此清本地令牌并跳登录
+      - 受保护接口：除 `/api/auth/register`、`/api/auth/login` 外，其余全部需要令牌
+    decided:
+      - "token 有效期 12 小时（2026-11-17 P1 拍板）"
+      - "不做刷新令牌，记入 RC 备选（2026-11-17 P1 拍板）"
+      - "登录后 12 小时内不需要重新输密码；过期一律 6002，前端自动跳登录"
+
+  authz:
+    strategy: 越权一律按「资源不存在」处理，不返回 403
+    code: 2001
+    http: 404
+    reason: |
+      返回 403 等于告诉攻击者「这个 id 存在，只是不属于你」，可被用来枚举他人文献。
+      统一按「不存在」处理，越权与真的不存在在响应上完全一致。
+      前端也不需要为 403 单独做一套提示。
+    applies_to:
+      - GET    /api/papers/{paperId}
+      - DELETE /api/papers/{paperId}
+      - GET    /api/papers/{paperId}/file
+      - POST   /api/qa/ask
+      - POST   /api/explain
+      - POST   /api/papers/import（归属当前用户，不存在越权问题，但同样不得读到他人已有记录）
+    invariant: 越权响应**不得携带他人任何业务字段**，连标题都不许回显
+    decided: 2026-11-17 P1 拍板采用 2001（不采用 403），**已冻结，不再接受二选一争论**
+
+  reading_order:
+    field_interface: readingOrder（citations[] 内）
+    field_db: chunks.reading_order（INT，可空）
+    semantics: |
+      页内阅读顺序，从 0 起。由 AI 服务按 (band, column, y0, x0) 排出：
+      先按「横跨整页的块」把页面切成若干横带（band），带内再按栏间空白分左右栏（column），
+      同栏内从上到下、从左到右。跨栏块 column=-1，排在本带末尾。
+    nullable_policy: |
+      历史数据为 null；前端**不得**依赖该字段定位，只能用于排序与排查。
+      真正的定位依据仍是 page + bboxX0/Y0/X1/Y1。
+    ddl: "ALTER TABLE chunks ADD COLUMN IF NOT EXISTS reading_order INT;"
+
+  explain_guard:
+    owner: P3（前端拦截）
+    rule: |
+      选中文本去除首尾空白后，满足以下任一条件时**不弹浮层、不发请求**：
+      - 为空
+      - 长度 < 2
+      - 全是数字（含数字与标点）
+    reason: 选空白或单个字符就弹浮层，用户会以为程序抽风；后端虽会返回 1001，但请求不该发出。
+    related_case: F7-04（Alpha 判「不适用」，Beta 补规则后应改判「通过」）
+    pending: 契约先有条款，代码随后（#67）
+
+  # ↑↑↑ 1.3.0 新增结束 ↑↑↑
 
   pagination:
     page_starts_at: 1
@@ -641,6 +914,13 @@ x-conventions:
       #   不用 401：本项目无登录态，401 会被前端通用拦截误判为「会话失效」。
       - { code: 3003,  http: 400, name: AI_SERVICE_AUTH_ERROR, message: "API Key 无效，请到设置页检查" }
       - { code: 4001,  http: 500, name: STORAGE_ERROR,     message: "文件存储失败" }
+      # ↓ 1.3.0 新增（2026-11-17）：auth 段。
+      #   注意：**不能用 4001/4002** —— 4001 已被 STORAGE_ERROR 占用。
+      #   不复用 2001：那是「文献不存在」，登录失败用它会误导前端跳转逻辑。
+      #   6001 同时覆盖「用户名不存在」与「密码错误」，防止探测账号是否存在。
+      - { code: 6001,  http: 401, name: AUTH_INVALID_CREDENTIALS, message: "用户名或密码不正确" }
+      - { code: 6002,  http: 401, name: AUTH_TOKEN_INVALID,       message: "登录已失效，请重新登录" }
+      - { code: 6003,  http: 400, name: AUTH_USERNAME_TAKEN,      message: "该用户名已被占用" }
       - { code: 5000,  http: 500, name: INTERNAL_ERROR,    message: "服务器内部错误" }
 
   who_owns:
