@@ -1,60 +1,665 @@
 [
-  {"no":103,"title":"[契约] auth 四接口 + 错误码 4001/4002","assignee":"lin612320","milestone":"Beta-W1","labels":["beta","docs","p1","epic:B13"],"body":"### 交付物\n契约 1.3.0 里的 auth 接口组：`POST /api/auth/register`、`POST /api/auth/login`、`GET /api/auth/me`、`POST /api/auth/logout`，以及错误码 4001（账号/密码不正确）、4002（令牌过期或无效）。\n\n### 验收\n- [ ] 四个接口的请求体、响应体、鉴权方式在契约中写全\n- [ ] 密码错与账号不存在**共用 4001**（不泄露账号是否存在）\n- [ ] 令牌过期/篡改走 4002 或 401，口径唯一\n\n### 依赖 / 文件\n- 依赖：无\n- 文件：`docs/01-api-contract.yaml`\n\n### 不做\n- 不做找回密码、短信验证、第三方登录"},
-  {"no":104,"title":"[契约] chunks.reading_order + citations 字段","assignee":"lin612320","milestone":"Beta-W1","labels":["beta","docs","p1","epic:B13"],"body":"### 交付物\n阅读顺序字段与引用字段的契约定义。\n\n### 验收\n- [ ] `chunks.reading_order`：类型、可空性、默认值、页内从 0 起，写明\n- [ ] 问答响应 `citations[]` 增加 `readingOrder`（可空）\n- [ ] 与 P5 的产出格式、P6 的建表语句三者一致\n\n### 依赖 / 文件\n- 依赖：无\n- 文件：`docs/01-api-contract.yaml`\n\n### 不做\n- 不改动既有 bbox 四字段的语义"},
-  {"no":105,"title":"[契约] 划词拦截规则 + 越权口径 + 冻结 1.3.0","assignee":"lin612320","milestone":"Beta-W1","labels":["beta","docs","p1","epic:B13"],"body":"### 交付物\n契约 1.3.0-frozen 的收尾：划词低质输入拦截规则、越权返回口径、changelog。\n\n### 验收\n- [ ] 写明空白/单字母/纯数字不弹浮层（#102 的前置）\n- [ ] 越权口径**定死一个**：403 或 2001，不许并存\n- [ ] 版本升 1.3.0-frozen，changelog 写清「为什么升」\n\n### 依赖 / 文件\n- 依赖：无\n- 文件：`docs/01-api-contract.yaml`\n\n### 不做\n- 非必要不改既有字段名与错误码"},
-  {"no":127,"title":"[契约] 实现与契约逐字段对账","assignee":"lin612320","milestone":"Beta-W1","labels":["beta","docs","p2","epic:B13"],"body":"### 交付物\n一份对账结论：契约声明的字段/错误码 vs 实际实现，逐条一致或列出偏差。\n\n### 验收\n- [ ] 覆盖 papers / qa / explain / search / auth 五组接口\n- [ ] 偏差项挂 BugList，不口头带过\n- [ ] 结论写进 `docs/契约评审要点.md` 或新开一节\n\n### 依赖 / 文件\n- 依赖：#105（契约冻结后才有基准）\n- 文件：`docs/01-api-contract.yaml`、`docs/测试/BugList.md`\n\n### 不做\n- 发现偏差不改代码，只记账（改代码归各模块负责人）\n\n> Alpha 上出过 BUG-003（字段不符）、BUG-016（Key 未转发）、BUG-017（缺标记）三条同类问题。"},
-  {"no":80,"title":"[集成] 双栏端到端走查","assignee":"lin612320","milestone":"Beta-W3","labels":["beta","test","p1","epic:B04"],"body":"### 交付物\n双栏论文走完主链六步的走查记录（起栈→上传→阅读→提问→点引用跳页→非 PDF 报错）。\n\n### 验收\n- [ ] 容器环境 8081 执行，与交付形态一致\n- [ ] 每步留截图，结论写进 `docs/验收走查/`\n- [ ] 问题挂 `BugList.md`\n\n### 依赖 / 文件\n- 依赖：#77、#79\n- 文件：`docs/验收走查/`\n\n### 不做\n- 只跑流程写结论，**不改任何源文件**"},
-  {"no":81,"title":"[集成] 单栏回归走查 + 与 Alpha 行为对比","assignee":"lin612320","milestone":"Beta-W3","labels":["beta","test","p1","epic:B04"],"body":"### 交付物\n单栏论文的回归记录，并与 Alpha 阶段行为逐项对比。\n\n### 验收\n- [ ] 单栏行为与 Alpha **完全一致**（渲染、翻页、缩放、引用跳转）\n- [ ] 差异项一条条列明，无「基本一致」这种模糊结论\n- [ ] 结论进 `docs/验收走查/`\n\n### 依赖 / 文件\n- 依赖：#80\n- 文件：`docs/验收走查/`、`docs/测试/测试报告-Alpha.md`\n\n### 不做\n- 只跑流程写结论，不改源文件"},
-  {"no":119,"title":"[文档] Beta 出口条件定稿","assignee":"lin612320","milestone":"Beta-W4","labels":["beta","docs","p1","epic:B19"],"body":"### 交付物\n`docs/Beta出口条件.md` 定稿版。\n\n### 验收\n- [ ] 出口改为：双栏滚动与引用定位 / 登录多用户 / 引用框列内精确 / 开放式召回\n- [ ] 写明本轮范围口径变化及原因\n- [ ] 写明未达成项与降级执行情况，每条带理由\n- [ ] P7 复核留痕\n\n### 依赖 / 文件\n- 依赖：全部功能卡\n- 文件：`docs/Beta出口条件.md`\n\n### 不做\n- 不写「全部达成」这类无法验证的结论"},
-  {"no":128,"title":"[文档] Beta 演示脚本 + 一次彩排","assignee":"lin612320","milestone":"Beta-W4","labels":["beta","docs","p1","epic:B19"],"body":"### 交付物\n可照读的演示脚本（分步、带时长）+ 一次完整彩排记录。\n\n### 验收\n- [ ] 覆盖：登录 → 上传 → 双栏阅读 → 提问 → 点引用 → 检索导入\n- [ ] 每步写明「点哪里、看到什么」，不写实现细节\n- [ ] 彩排跑通一次，卡点记下来\n\n### 依赖 / 文件\n- 依赖：#119\n- 文件：`docs/验收走查/`\n\n### 不做\n- 不录演示视频（RC 范畴）"},
-
-  {"no":123,"title":"[前端] 引用框三态样式统一 + 双栏虚线框图例","assignee":"star675411","milestone":"Beta-W1","labels":["beta","frontend","p2","epic:B03"],"body":"### 交付物\n三种引用框状态视觉统一：精确=实线、整块=虚线、无坐标=只闪页；界面上有图例说明。\n\n### 验收\n- [ ] 三态样式在 50%/100%/200% 缩放下都不糊、不偏移\n- [ ] 图例能让人看懂「虚线代表这是整段范围」\n- [ ] 不改变现有 `bboxMode` 三态语义\n\n### 依赖 / 文件\n- 依赖：无（纯样式，可先做）\n- 文件：`frontend/src/views/ReaderView.vue`（样式段）\n\n### 不做\n- 不改定位算法（那是 #76）"},
-  {"no":124,"title":"[前端] 长论文首屏渲染优化（>50 页 ≤3 秒）","assignee":"star675411","milestone":"Beta-W1","labels":["beta","frontend","p2","epic:B02"],"body":"### 交付物\n大文档首屏可见时间降到 3 秒内。\n\n### 验收\n- [ ] 50 页以上论文，首屏（第 1 页可读）≤3 秒\n- [ ] 不改变「先渲染全部页」的既有行为，只优化首屏优先级\n- [ ] 单栏/双栏都不出现白屏\n\n### 依赖 / 文件\n- 依赖：无\n- 文件：`frontend/src/views/ReaderView.vue`\n\n### 不做\n- 不引入虚拟滚动（改动过大，留 RC）"},
-  {"no":75,"title":"[前端] 双栏页「当前栏」判定","assignee":"star675411","milestone":"Beta-W2","labels":["beta","frontend","p1","epic:B02"],"body":"### 交付物\n双栏页滚动时，系统知道用户在看左栏还是右栏，页码与进度不再来回跳。\n\n### 验收\n- [ ] 判据用「阅读顺序里最后可见的块」，不用页\n- [ ] 双栏论文连续滚动，页码/进度单调不跳\n- [ ] 单栏论文行为不变\n\n### 依赖 / 文件\n- 依赖：#73（reading_order 落库）\n- 文件：`frontend/src/views/ReaderView.vue`\n\n### 不做\n- 不做页面重排（PDF 是排版文件，重排等于重做版面引擎）"},
-  {"no":76,"title":"[前端] 引用块级跳转","assignee":"star675411","milestone":"Beta-W2","labels":["beta","frontend","p1","epic:B02"],"body":"### 交付物\n点引用直接滚到那段话所在位置，而不是页面顶部。\n\n### 验收\n- [ ] 目标位置 = `页元素顶 + bboxY0 × 页高 − 40px`\n- [ ] 跳完那段话落在视口内（上下不超过半屏）\n- [ ] 页码非法时只提示，不滚动\n\n### 依赖 / 文件\n- 依赖：#73\n- 文件：`frontend/src/views/ReaderView.vue`\n\n### 不做\n- 不改 `bboxMode` 三态语义"},
-  {"no":77,"title":"[前端] 缩放 50%/200% 定位重算","assignee":"star675411","milestone":"Beta-W2","labels":["beta","frontend","p1","epic:B02"],"body":"### 交付物\n缩放后引用框与滚动定位仍然对齐。\n\n### 验收\n- [ ] 50% / 100% / 200% 三档，引用框都套在目标段落上\n- [ ] 缩放时用现有 `captureAnchor` / `restoreAnchor` 机制，不另造一套\n- [ ] 缩放不触发整页闪白\n\n### 依赖 / 文件\n- 依赖：#76\n- 文件：`frontend/src/views/ReaderView.vue`\n\n### 不做\n- 不改缩放上下限（0.6–2.4 保持）"},
-  {"no":79,"title":"[前端] 双栏 10 题框套准 + 旋转页对齐","assignee":"star675411","milestone":"Beta-W3","labels":["beta","frontend","p1","epic:B03"],"body":"### 交付物\n双栏引用框套准的实测结论。\n\n### 验收\n- [ ] 双栏 10 道题，`precise` 命中 ≥7，其余允许 `block`\n- [ ] 框不跨栏（x0/x1 落在同一栏区间）\n- [ ] 旋转 90°/180°/270° 页仍对齐（沿用 F6-08 样本）\n\n### 依赖 / 文件\n- 依赖：#78\n- 文件：`docs/测试/`\n\n### 不做\n- 不承诺逐句/逐字级定位"},
-
-  {"no":126,"title":"[前端] 扫描件提示（无文字层明确提示需 OCR）","assignee":"hexag0n1","milestone":"Beta-W1","labels":["beta","frontend","p2","epic:B05"],"body":"### 交付物\n上传扫描件后，界面明确说明「该 PDF 无文字层，暂不支持，需 OCR」，而不是含糊的解析失败。\n\n### 验收\n- [ ] 依据后端 `parseError` 里的无文字层标识展示对应中文提示\n- [ ] 提示里给出下一步建议（换带文字层的 PDF）\n- [ ] 不影响正常论文的解析流程\n\n### 依赖 / 文件\n- 依赖：无（先按现有 `parseError` 文案做）\n- 文件：`frontend/src/views/UploadView.vue`、`frontend/src/views/LibraryView.vue`\n\n### 不做\n- 不做 OCR（明确在本轮范围外）"},
-  {"no":92,"title":"[前端] 登录/注册页静态稿 + 表单校验","assignee":"hexag0n1","milestone":"Beta-W1","labels":["beta","frontend","p1","epic:B08"],"body":"### 交付物\n登录页与注册页的界面与本地校验（不接接口）。\n\n### 验收\n- [ ] 用户名/密码必填、长度与字符校验，错误提示中文\n- [ ] 登录与注册可互相跳转\n- [ ] 布局与现有页面风格一致（不新造一套样式）\n\n### 依赖 / 文件\n- 依赖：无（接口未就绪也能做）\n- 文件：`frontend/src/views/`（新增 LoginView/RegisterView）、`frontend/src/router/index.js`\n\n### 不做\n- 不做找回密码、验证码"},
-  {"no":102,"title":"[前端] 划词低质输入拦截","assignee":"hexag0n1","milestone":"Beta-W2","labels":["beta","frontend","p2","epic:B12"],"body":"### 交付物\n空白、单字母、纯数字不再弹翻译浮层。\n\n### 验收\n- [ ] 三类低质输入均不弹浮层\n- [ ] 正常选词行为不变\n- [ ] F7-04 用例状态由「不适用」改判「通过」\n\n### 依赖 / 文件\n- 依赖：#105（契约补明文规则，先有条款再改代码）\n- 文件：`frontend/src/views/ReaderView.vue`（选区处理段）\n\n### 不做\n- 不改后端截断逻辑（逻辑下沉后端是 D18 的决定，不回退）"},
-  {"no":93,"title":"[前端] 路由守卫 + 登录后回原页","assignee":"hexag0n1","milestone":"Beta-W2","labels":["beta","frontend","p1","epic:B08"],"body":"### 交付物\n未登录访问受保护页自动跳登录，登录后回到原目标页。\n\n### 验收\n- [ ] 未登录访问 `/library`、`/reader/:id` 跳 `/login`\n- [ ] 登录成功回到原本要看的页面（不是首页）\n- [ ] 白名单页面（登录/注册）不被拦截\n\n### 依赖 / 文件\n- 依赖：#86（登录接口）\n- 文件：`frontend/src/router/index.js`\n\n### 不做\n- 不做权限分级（本轮只有单一用户角色）"},
-  {"no":94,"title":"[前端] token 持久化（刷新不掉线）","assignee":"hexag0n1","milestone":"Beta-W3","labels":["beta","frontend","p1","epic:B08"],"body":"### 交付物\n刷新页面保持登录态。\n\n### 验收\n- [ ] token 持久化后刷新不掉线\n- [ ] 登出后 token 被清除干净\n- [ ] 多个标签页共享登录态\n\n### 依赖 / 文件\n- 依赖：#93\n- 文件：`frontend/src/composables/`（新增鉴权状态）、`frontend/src/api/papers.js`\n\n### 不做\n- 不做「记住我」、「自动续期」（RC 再看）"},
-  {"no":129,"title":"[前端] 401 自动登出 + 统一错误提示","assignee":"hexag0n1","milestone":"Beta-W3","labels":["beta","frontend","p1","epic:B08"],"body":"### 交付物\n任何接口返回 401 时自动登出并给出中文提示，不白屏。\n\n### 验收\n- [ ] 401 → 清 token → 跳登录页 → 提示「登录已失效」\n- [ ] 不出现裸露报错或白屏\n- [ ] 与现有空状态/异常提示组件统一\n\n### 依赖 / 文件\n- 依赖：#94\n- 文件：`frontend/src/api/papers.js`、`frontend/src/router/index.js`\n\n### 不做\n- 不做自动重试"},
-
-  {"no":85,"title":"[后端] JwtFilter + 401 拦截 + 错误码落位","assignee":"Linyuue","milestone":"Beta-W2","labels":["beta","backend","p1","epic:B06"],"body":"### 交付物\n请求进入业务前统一验签的拦截器，以及错误码字典落位。\n\n### 验收\n- [ ] 无 token / 假 token / 篡改签名 → 401\n- [ ] 验签通过后把 user_id 放进请求上下文供后续使用\n- [ ] 4001/4002 加入 `ErrorCode` 并与契约一致\n\n### 依赖 / 文件\n- 依赖：#82（users 表）\n- 文件：`backend/src/main/java/com/papermind/backend/`（JwtFilter、ErrorCode）\n\n### 不做\n- 不做接口级权限分级"},
-  {"no":86,"title":"[后端] 注册 + 登录 + bcrypt + 签发","assignee":"Linyuue","milestone":"Beta-W2","labels":["beta","backend","p1","epic:B06"],"body":"### 交付物\n注册与登录两个接口，密码 bcrypt 入库，登录成功签发 JWT。\n\n### 验收\n- [ ] `POST /api/auth/register`：用户名唯一，密码 bcrypt 入库\n- [ ] `POST /api/auth/login`：校验通过后签发 token，返回有效期\n- [ ] 响应走统一 ApiResponse，`code=0`\n\n### 依赖 / 文件\n- 依赖：#85\n- 文件：`backend/.../controller/AuthController.java`、`service/`\n\n### 不做\n- 不做找回密码、验证码、第三方登录"},
-
-  {"no":88,"title":"[后端] 登录安全自查","assignee":"Linyuue","milestone":"Beta-W2","labels":["beta","backend","p1","epic:B06"],"body":"### 交付物\n一份安全自查结论 + 必要的修正。\n\n### 验收\n- [ ] 密码不落明文、不出现在任何日志里\n- [ ] 账号不存在与密码错误返回同一错误码\n- [ ] 篡改签名/过期 token 均被拒\n- [ ] 自查结论写进 issue 评论\n\n### 依赖 / 文件\n- 依赖：#86\n- 文件：`backend/`\n\n### 不做\n- 不做渗透测试"},
-  {"no":89,"title":"[后端] papers 四处过滤（列表/详情/删除/取文件）","assignee":"Linyuue","milestone":"Beta-W3","labels":["beta","backend","p1","epic:B07"],"body":"### 交付物\n文献相关接口全部按 token 的 user_id 过滤。\n\n### 验收\n- [ ] 列表、详情、删除、取文件四处都只操作本人数据\n- [ ] 访问他人 paper_id 返回统一越权口径（不泄露存在性）\n- [ ] 取文件接口不能绕过过滤读到别人的 PDF\n\n### 依赖 / 文件\n- 依赖：#86\n- 文件：`backend/.../controller/PaperController.java`\n\n### 不做\n- 不做共享库"},
-  {"no":90,"title":"[后端] qa + explain + import 三处过滤 + 越权口径统一","assignee":"Linyuue","milestone":"Beta-W3","labels":["beta","backend","p1","epic:B07"],"body":"### 交付物\n问答、划词解释、检索导入三处按用户过滤，越权口径全项目统一。\n\n### 验收\n- [ ] 问答与 explain 只能作用于本人论文\n- [ ] 导入的文献归属当前用户\n- [ ] 越权响应**只准一种**（403 或 2001），与 #105 契约一致\n\n### 依赖 / 文件\n- 依赖：#89\n- 文件：`backend/.../controller/QaController.java`、`ExplainController.java`、`service/PaperImportService.java`\n\n### 不做\n- 不改 Prompt 与检索逻辑（P5 地盘）"},
-  {"no":106,"title":"[后端] 检索双源并发调用 + 结果合并","assignee":"Linyuue","milestone":"Beta-W3","labels":["beta","backend","p1","epic:B14"],"body":"### 交付物\n一次请求同时查 arXiv 与 OpenAlex，结果合并返回。\n\n### 验收\n- [ ] 两源并发调用，整体耗时不超过单源的两倍\n- [ ] 合并结果保留每条原本的 `source`\n- [ ] 任一源失败不影响另一源结果（带 `degraded`）\n\n### 依赖 / 文件\n- 依赖：#105\n- 文件：`backend/.../controller/SearchController.java`、`service/ArxivClient.java`、`OpenAlexClient.java`\n\n### 不做\n- 不做 Semantic Scholar 第三源"},
-  {"no":107,"title":"[后端] 三级去重 + 稳定排序","assignee":"Linyuue","milestone":"Beta-W3","labels":["beta","backend","p2","epic:B14"],"body":"### 交付物\n合并结果去重与稳定排序。\n\n### 验收\n- [ ] 去重三级：DOI → arxiv_id → 标题+年份\n- [ ] 同一 query 连续两次结果次序**完全一致**\n- [ ] 响应仍带 `degraded` / `cached`（BUG-017 修过的不许回退）\n\n### 依赖 / 文件\n- 依赖：#106\n- 文件：`backend/.../controller/SearchController.java`\n\n### 不做\n- 不做个性化排序"},
-  {"no":109,"title":"[后端] 非 arXiv 来源导入打通（含 source 枚举冲突修复）","assignee":"Linyuue","milestone":"Beta-W3","labels":["beta","backend","p2","epic:B14"],"body":"### 交付物\nOpenAlex 或纯 PDF 直链来源也能导入成功。\n\n### 验收\n- [ ] `PaperImportService` 不再写 `source='import'`（该值不在 CHECK 白名单里，会撞约束被兜成 5000）\n- [ ] `source` 取上游 origin，或与契约把枚举写死\n- [ ] 非 arXiv 来源导入成功，并出现在文献列表\n\n### 依赖 / 文件\n- 依赖：#107\n- 文件：`backend/.../service/PaperImportService.java`、`docs/03-数据库表结构.sql`\n\n### 不做\n- 不绕过付费墙，非 OA 只给原文链接\n\n> Alpha 没暴露：前端只开了 arXiv 选项，OpenAlex 只测了检索没测导入。"},
-
-  {"no":71,"title":"[AI] 通栏块识别 + 切带（_split_bands）","assignee":"Cheongfan","milestone":"Beta-W1","labels":["beta","ai","p1","epic:B01"],"body":"### 交付物\n把一页按「横跨整页的块」切成若干横带（band）。\n\n### 验收\n- [ ] 宽度 > 页宽 75% 的块判定为通栏块，单独成带\n- [ ] 通栏块之间的区域形成独立带，带序从上到下\n- [ ] 单栏页走原逻辑，行为不变\n\n### 依赖 / 文件\n- 依赖：#104（契约字段）\n- 文件：`ai-service/app/services/chunker.py`\n\n### 不做\n- 不改抽取（`pdf_extractor.py`）\n- 不碰切片文本规则（700 字上限、100 字重叠）"},
-  {"no":72,"title":"[AI] 栏间空白检测（0.35–0.65 投影法）","assignee":"Cheongfan","milestone":"Beta-W1","labels":["beta","ai","p1","epic:B01"],"body":"### 交付物\n在带内自动找出栏间竖缝（gutter）的位置。\n\n### 验收\n- [ ] 把所有块的 [x0,x1] 投影到横轴，统计覆盖次数\n- [ ] 在 0.35–0.65 区间找覆盖最少的 x 作为 gutter\n- [ ] 覆盖次数接近 0 才认（否则判为单栏）\n\n### 依赖 / 文件\n- 依赖：#71\n- 文件：`ai-service/app/services/chunker.py`\n\n### 不做\n- 不写死 x=0.5（对不齐的期刊会切错）"},
-  {"no":73,"title":"[AI] (band, column, y, x) 排序 + 写 reading_order","assignee":"Cheongfan","milestone":"Beta-W2","labels":["beta","ai","p1","epic:B01"],"body":"### 交付物\n按阅读顺序重排块，并把顺序写进 `chunks.reading_order`。\n\n### 验收\n- [ ] 排序键为 `(band, column, y0, x0)`，跨栏块（column=-1）排本带末尾\n- [ ] chunk 的 `reading_order` 取其首块的 order\n- [ ] 落库字段与契约一致\n\n### 依赖 / 文件\n- 依赖：#72\n- 文件：`ai-service/app/services/chunker.py`、`ai-service/app/db/chunks.py`\n\n### 不做\n- 不改块内文字内容，只改顺序"},
-  {"no":74,"title":"[AI] 基线回归 + 3 篇双栏验证 + check_reading_order.py","assignee":"Cheongfan","milestone":"Beta-W2","labels":["beta","ai","p1","epic:B01"],"body":"### 交付物\n证明「没顺手改坏单栏」的回归结论 + 一个可复跑的对比脚本。\n\n### 验收\n- [ ] 单栏论文跑 `check_chunker.py`，基线哈希**完全一致**\n- [ ] 3 篇双栏论文抽 5 段，人工确认段落连贯、无跨栏拼接\n- [ ] 新增 `check_reading_order.py`，打印重排前后顺序对比\n\n### 依赖 / 文件\n- 依赖：#73\n- 文件：`ai-service/scripts/check_reading_order.py`\n\n### 不做\n- 三栏/异形版面不做，标 `layout=unknown`\n\n> ⛔ 硬卡点：本条不完成，P2 的三条与 #100 全部阻塞。"},
-  {"no":78,"title":"[AI] 按 column 取主栏 bbox，标 precise/block","assignee":"Cheongfan","milestone":"Beta-W3","labels":["beta","ai","p1","epic:B03"],"body":"### 交付物\n双栏 chunk 的引用框收窄到单栏内，并按情况标 `precise` 或 `block`。\n\n### 验收\n- [ ] chunk 内块按 column 分组，取块数最多的一栏做 bbox 并集\n- [ ] 块均匀分布在两栏或含跨栏块时，仍标 `block`\n- [ ] 单栏内 ≥60% 块时标 `precise`\n\n### 依赖 / 文件\n- 依赖：#73\n- 文件：`ai-service/app/services/chunker.py`\n\n### 不做\n- 不承诺逐句精确"},
-  {"no":97,"title":"[AI] 概览类识别 + 放宽检索路径","assignee":"Cheongfan","milestone":"Beta-W2","labels":["beta","ai","p2","epic:B10"],"body":"### 交付物\n问「这篇讲了什么」能答出概括，而不是回「本文未涉及」。\n\n### 验收\n- [ ] 能识别概览类问题（讲了什么/解决什么问题/贡献/数据/结论）\n- [ ] 概览类放宽 top_k 到 8，并优先纳入首段、末段、摘要附近段\n- [ ] 未涉及题仍拒答，不放宽这道门\n\n### 依赖 / 文件\n- 依赖：无\n- 文件：`ai-service/app/services/RAG.py`\n\n### 不做\n- 不做多轮对话记忆、不换模型\n\n> 根因：`top_k=3` + 相似度阈值 0.35 + prompt「字面相关也算未涉及」三处叠加。"},
-  {"no":99,"title":"[AI] 召回回归三组","assignee":"Cheongfan","milestone":"Beta-W2","labels":["beta","ai","p2","epic:B10"],"body":"### 交付物\n改动前后三组对照结论。\n\n### 验收\n- [ ] 新增 5 道概览题命中 ≥4\n- [ ] Alpha 原 10 题不退步（仍 ≥9/10）\n- [ ] 未涉及 3 题仍 100% 拒答\n\n### 依赖 / 文件\n- 依赖：#97\n- 文件：`ai-service/scripts/eval_qa.py`、`docs/测试/`\n\n### 不做\n- 不改题库判定口径（沿用 `命中率判定口径.md`）"},
-  {"no":100,"title":"[AI] 引用片段截断与碎片过滤","assignee":"Cheongfan","milestone":"Beta-W3","labels":["beta","ai","p2","epic:B11"],"body":"### 交付物\n引用片段是整句话，不是从词中间切断的半句。\n\n### 验收\n- [ ] 按段落边界截断，结尾落在句末或段末\n- [ ] 标题/表格/公式碎片不作为引用首句\n- [ ] 抽 10 条验证：词中截断 0 条\n\n### 依赖 / 文件\n- 依赖：#73\n- 文件：`ai-service/app/services/RAG.py`\n\n### 不做\n- 不做逐句对齐、不改 chunk 大小上限"},
-
-  {"no":82,"title":"[数据] 建 users 表 + 外键 + 建表语句升 1.1.0","assignee":"lzzzzzasd","milestone":"Beta-W1","labels":["beta","data","p1","epic:B05"],"body":"### 交付物\n`users` 表 + `papers.user_id` 外键 + 表结构文档升级。\n\n### 验收\n- [ ] `users` 表：id / username（唯一）/ password_hash / created_at\n- [ ] `papers.user_id` 指向 `users(id)`\n- [ ] 建表语句与 `ALTER` 都写进 `docs/03-数据库表结构.sql`，版本升 1.1.0-frozen\n\n### 依赖 / 文件\n- 依赖：#103（契约 auth 接口）\n- 文件：`docs/03-数据库表结构.sql`\n\n### 不做\n- 不动 chunks / annotation / reading_session 结构\n\n> ⚠️ initdb 目录只在新库首次启动执行：**存量库必须单独跑 ALTER**，否则重演 BUG-019。"},
-  {"no":83,"title":"[数据] 迁移脚本（存量归 user_id=1，幂等）+ 存量库实测","assignee":"lzzzzzasd","milestone":"Beta-W1","labels":["beta","data","p1","epic:B05"],"body":"### 交付物\n可重复执行的迁移脚本 + 在存量库上跑通的记录。\n\n### 验收\n- [ ] 存量论文全部归属 legacy 用户 `user_id=1`\n- [ ] 脚本**幂等**：跑一次与跑三次结果一致、不报错\n- [ ] 在真实存量库上实测并留输出\n\n### 依赖 / 文件\n- 依赖：#82\n- 文件：`scripts/`（新增迁移脚本）\n\n### 不做\n- 不重建数据库、不删卷"},
-  {"no":84,"title":"[数据] 旧论文回归（打开 + 提问 + 删除）","assignee":"lzzzzzasd","milestone":"Beta-W1","labels":["beta","data","p1","epic:B05"],"body":"### 交付物\n迁移后旧数据可用的结论。\n\n### 验收\n- [ ] 迁移前上传的论文能打开、能提问、能删除\n- [ ] 页数/切片数与迁移前一致\n- [ ] 结论写进 issue 评论\n\n### 依赖 / 文件\n- 依赖：#83\n- 文件：`docs/验收走查/`\n\n### 不做\n- 不改业务代码\n\n> ⛔ 硬卡点：本条不完成，P4 的登录相关四条全部阻塞。"},
-  {"no":112,"title":"[部署] 三端构建 workflow","assignee":"lzzzzzasd","milestone":"Beta-W2","labels":["beta","deploy","p2","epic:B16"],"body":"### 交付物\n`.github/workflows/ci.yml` 的构建阶段。\n\n### 验收\n- [ ] 后端 `mvn -B package`、前端 `npm ci && npm run build`、ai-service 依赖安装三条 job\n- [ ] PR 与 master push 都触发\n- [ ] 错误日志可读，失败能定位到哪一步\n\n### 依赖 / 文件\n- 依赖：#105\n- 文件：`.github/workflows/ci.yml`\n\n### 不做\n- 不做自动部署"},
-  {"no":113,"title":"[部署] 单测 + ai-service 脚本自检 job","assignee":"lzzzzzasd","milestone":"Beta-W2","labels":["beta","deploy","p2","epic:B16"],"body":"### 交付物\nCI 中的测试阶段。\n\n### 验收\n- [ ] 后端单测纳入 CI\n- [ ] ai-service 的 `check_chunker.py` 等自检脚本纳入 CI\n- [ ] 任何一步失败，PR 显示红灯\n\n### 依赖 / 文件\n- 依赖：#112\n- 文件：`.github/workflows/ci.yml`\n\n### 不做\n- 不做覆盖率门禁"},
-  {"no":114,"title":"[部署] PR 模板 + 故意提坏 PR 验证真被拦住","assignee":"lzzzzzasd","milestone":"Beta-W3","labels":["beta","deploy","p2","epic:B16"],"body":"### 交付物\nPR 模板 + 一次「红灯拦截」的实证。\n\n### 验收\n- [ ] PR 模板含「本地已跑通 / 已在容器 8081 验证」勾选项\n- [ ] 故意提一个构建失败的 PR，**确实被拦住**并留截图\n- [ ] 结论写进 issue 评论\n\n### 依赖 / 文件\n- 依赖：#113\n- 文件：`.github/`\n\n### 不做\n- 不设分支保护强制规则（按现有多分支约定）"},
-  {"no":115,"title":"[部署] backup.ps1（不备 hf-cache）","assignee":"lzzzzzasd","milestone":"Beta-W3","labels":["beta","deploy","p2","epic:B17"],"body":"### 交付物\n一条命令备份数据库与上传文件。\n\n### 验收\n- [ ] 备份 PostgreSQL 数据与 `uploads` 卷\n- [ ] **明确不备份 `hf-cache`**（2.2GB 模型），原因写进脚本注释\n- [ ] 备份产物有明确命名与时间戳\n\n### 依赖 / 文件\n- 依赖：无\n- 文件：`scripts/backup.ps1`\n\n### 不做\n- 不做定时任务、不做异地存储"},
-  {"no":116,"title":"[部署] restore.ps1 + 实测还原一次","assignee":"lzzzzzasd","milestone":"Beta-W3","labels":["beta","deploy","p2","epic:B17"],"body":"### 交付物\n还原脚本 + 一次真实还原记录。\n\n### 验收\n- [ ] 还原后文献列表与问答均可用\n- [ ] **实测还原一次**并留命令输出（没实测等于没做）\n- [ ] 还原步骤写进 `scripts/README.md`\n\n### 依赖 / 文件\n- 依赖：#115\n- 文件：`scripts/restore.ps1`、`scripts/README.md`\n\n### 不做\n- 不碰 `docker compose down -v`"},
-
-  {"no":120,"title":"[测试] Beta 用例表 v1.0 起草","assignee":"xingniansky","milestone":"Beta-W1","labels":["beta","test","p1","epic:B20"],"body":"### 交付物\n覆盖 51 条子单验收点的 Beta 用例表初版。\n\n### 验收\n- [ ] 每个功能卡至少 2 条用例，含正常/异常/边界\n- [ ] 用例格式沿用 `冒烟用例表-Alpha延展段.md`\n- [ ] 每条用例写明判定标准（可勾选）\n\n### 依赖 / 文件\n- 依赖：无\n- 文件：`docs/测试/冒烟用例表-Beta.md`\n\n### 不做\n- 不测压测与并发（RC 范畴）\n\n> 提前到 W1 做，避免像 Alpha 一样压到最后三天。"},
-  {"no":117,"title":"[测试] 检索降级用例：超时 / 断网","assignee":"xingniansky","milestone":"Beta-W2","labels":["beta","test","p2","epic:B18"],"body":"### 交付物\n两类异常的用户可见行为结论。\n\n### 验收\n- [ ] 外部接口超时：界面提示「数据源暂不可用」，不是空白\n- [ ] 断网：有缓存给缓存+更新时间，无缓存明确说是网络问题\n- [ ] 两条用例均有结论，无空白格\n\n### 依赖 / 文件\n- 依赖：现有单源检索即可测，可提前\n- 文件：`docs/测试/冒烟用例表-Beta.md`\n\n### 不做\n- 不做压测"},
-  {"no":118,"title":"[测试] 检索降级用例：缓存过期 / 429","assignee":"xingniansky","milestone":"Beta-W2","labels":["beta","test","p2","epic:B18"],"body":"### 交付物\n缓存与限流两类异常结论。\n\n### 验收\n- [ ] 缓存过期：重新请求，不报错\n- [ ] 429 限流：明确提示，不是转圈到死\n- [ ] 前端文案与 `degraded` 标记一致\n\n### 依赖 / 文件\n- 依赖：#117\n- 文件：`docs/测试/冒烟用例表-Beta.md`\n\n### 不做\n- 不做限流加固"},
-  {"no":95,"title":"[测试] 多用户隔离 9 条交叉用例","assignee":"xingniansky","milestone":"Beta-W3","labels":["beta","test","p1","epic:B09"],"body":"### 交付物\nA/B 双账号交叉越权的实测结论。\n\n### 验收\n- [ ] 9 条交叉用例（列表/详情/删除/问答/explain/取文件/导入 等）全部被拒\n- [ ] 在**容器环境 8081**执行\n- [ ] 每条带结论\n\n### 依赖 / 文件\n- 依赖：#90、#129\n- 文件：`docs/测试/冒烟用例表-Beta.md`\n\n### 不做\n- 不改代码，只提 Issue"},
-  {"no":96,"title":"[测试] 隔离结果入用例表 + 异常挂 BugList","assignee":"xingniansky","milestone":"Beta-W3","labels":["beta","test","p1","epic:B09"],"body":"### 交付物\n隔离验收的归档记录。\n\n### 验收\n- [ ] 9 条结果写进用例表\n- [ ] 任何异常挂 `BugList.md`，带复现步骤\n- [ ] 无「无原因空白」\n\n### 依赖 / 文件\n- 依赖：#95\n- 文件：`docs/测试/BugList.md`\n\n### 不做\n- 不改代码"},
-  {"no":121,"title":"[测试] Beta 测试报告（每条带证据来源）","assignee":"xingniansky","milestone":"Beta-W4","labels":["beta","test","p1","epic:B20"],"body":"### 交付物\n`docs/测试/测试报告-Beta.md`。\n\n### 验收\n- [ ] 范围、环境、方法、结论齐全\n- [ ] 每条结论带证据（截图/日志/命令输出）\n- [ ] 数字只有一个来源，并写明来自哪个文件\n\n### 依赖 / 文件\n- 依赖：全部功能卡\n- 文件：`docs/测试/测试报告-Beta.md`\n\n### 不做\n- 不另起一套口径"},
-  {"no":122,"title":"[文档] Scrum 博客 + BugList 升版 + 用例表定稿","assignee":"xingniansky","milestone":"Beta-W4","labels":["beta","docs","p1","epic:B20"],"body":"### 交付物\nBeta 阶段的 Scrum 博客与文档定稿。\n\n### 验收\n- [ ] 博客四要素齐全（每人工作+链接、燃尽图、例会照片、签入记录）\n- [ ] `BugList.md` 升版，S0/S1 全部有处置\n- [ ] 用例表转为最终版\n\n### 依赖 / 文件\n- 依赖：#121\n- 文件：`docs/blog/`、`docs/测试/BugList.md`\n\n### 不做\n- 不做演示视频（RC）"}
+  {
+    "no": 103,
+    "title": "[契约] auth 四接口 + 错误码 6001-6003",
+    "assignee": "lin612320",
+    "milestone": "Beta-W1",
+    "labels": [
+      "beta",
+      "docs",
+      "p1",
+      "epic:B13"
+    ],
+    "body": "### 交付物\n契约 1.3.0 里的 auth 接口组：`POST /api/auth/register`、`POST /api/auth/login`、`GET /api/auth/me`、`POST /api/auth/logout`，以及错误码 6001（账号/密码不正确）、6002（令牌过期或无效）。\n\n### 验收\n- [ ] 四个接口的请求体、响应体、鉴权方式在契约中写全\n- [ ] 密码错与账号不存在**共用 6001**（不泄露账号是否存在）\n- [ ] 令牌过期/篡改走 6002 或 401，口径唯一\n\n### 依赖 / 文件\n- 依赖：无\n- 文件：`docs/01-api-contract.yaml`\n\n### 不做\n- 不做找回密码、短信验证、第三方登录"
+  },
+  {
+    "no": 104,
+    "title": "[契约] chunks.reading_order + citations 字段",
+    "assignee": "lin612320",
+    "milestone": "Beta-W1",
+    "labels": [
+      "beta",
+      "docs",
+      "p1",
+      "epic:B13"
+    ],
+    "body": "### 交付物\n阅读顺序字段与引用字段的契约定义。\n\n### 验收\n- [ ] `chunks.reading_order`：类型、可空性、默认值、页内从 0 起，写明\n- [ ] 问答响应 `citations[]` 增加 `readingOrder`（可空）\n- [ ] 与 P5 的产出格式、P6 的建表语句三者一致\n\n### 依赖 / 文件\n- 依赖：无\n- 文件：`docs/01-api-contract.yaml`\n\n### 不做\n- 不改动既有 bbox 四字段的语义"
+  },
+  {
+    "no": 105,
+    "title": "[契约] 划词拦截规则 + 越权口径 + 冻结 1.3.0",
+    "assignee": "lin612320",
+    "milestone": "Beta-W1",
+    "labels": [
+      "beta",
+      "docs",
+      "p1",
+      "epic:B13"
+    ],
+    "body": "### 交付物\n契约 1.3.0-frozen 的收尾：划词低质输入拦截规则、越权返回口径、changelog。\n\n### 验收\n- [ ] 写明空白/单字母/纯数字不弹浮层（#67 的前置）\n- [ ] 越权口径**定死一个**：403 或 2001，不许并存\n- [ ] 版本升 1.3.0-frozen，changelog 写清「为什么升」\n\n### 依赖 / 文件\n- 依赖：无\n- 文件：`docs/01-api-contract.yaml`\n\n### 不做\n- 非必要不改既有字段名与错误码"
+  },
+  {
+    "no": 127,
+    "title": "[契约] 实现与契约逐字段对账",
+    "assignee": "lin612320",
+    "milestone": "Beta-W1",
+    "labels": [
+      "beta",
+      "docs",
+      "p2",
+      "epic:B13"
+    ],
+    "body": "### 交付物\n一份对账结论：契约声明的字段/错误码 vs 实际实现，逐条一致或列出偏差。\n\n### 验收\n- [ ] 覆盖 papers / qa / explain / search / auth 五组接口\n- [ ] 偏差项挂 BugList，不口头带过\n- [ ] 结论写进 `docs/契约评审要点.md` 或新开一节\n\n### 依赖 / 文件\n- 依赖：#53（契约冻结后才有基准）\n- 文件：`docs/01-api-contract.yaml`、`docs/测试/BugList.md`\n\n### 不做\n- 发现偏差不改代码，只记账（改代码归各模块负责人）\n\n> Alpha 上出过 BUG-003（字段不符）、BUG-016（Key 未转发）、BUG-017（缺标记）三条同类问题。"
+  },
+  {
+    "no": 80,
+    "title": "[集成] 双栏端到端走查",
+    "assignee": "lin612320",
+    "milestone": "Beta-W3",
+    "labels": [
+      "beta",
+      "test",
+      "p1",
+      "epic:B04"
+    ],
+    "body": "### 交付物\n双栏论文走完主链六步的走查记录（起栈→上传→阅读→提问→点引用跳页→非 PDF 报错）。\n\n### 验收\n- [ ] 容器环境 8081 执行，与交付形态一致\n- [ ] 每步留截图，结论写进 `docs/验收走查/`\n- [ ] 问题挂 `BugList.md`\n\n### 依赖 / 文件\n- 依赖：#63、#64\n- 文件：`docs/验收走查/`\n\n### 不做\n- 只跑流程写结论，**不改任何源文件**"
+  },
+  {
+    "no": 81,
+    "title": "[集成] 单栏回归走查 + 与 Alpha 行为对比",
+    "assignee": "lin612320",
+    "milestone": "Beta-W3",
+    "labels": [
+      "beta",
+      "test",
+      "p1",
+      "epic:B04"
+    ],
+    "body": "### 交付物\n单栏论文的回归记录，并与 Alpha 阶段行为逐项对比。\n\n### 验收\n- [ ] 单栏行为与 Alpha **完全一致**（渲染、翻页、缩放、引用跳转）\n- [ ] 差异项一条条列明，无「基本一致」这种模糊结论\n- [ ] 结论进 `docs/验收走查/`\n\n### 依赖 / 文件\n- 依赖：#55\n- 文件：`docs/验收走查/`、`docs/测试/测试报告-Alpha.md`\n\n### 不做\n- 只跑流程写结论，不改源文件"
+  },
+  {
+    "no": 119,
+    "title": "[文档] Beta 出口条件定稿",
+    "assignee": "lin612320",
+    "milestone": "Beta-W4",
+    "labels": [
+      "beta",
+      "docs",
+      "p1",
+      "epic:B19"
+    ],
+    "body": "### 交付物\n`docs/Beta出口条件.md` 定稿版。\n\n### 验收\n- [ ] 出口改为：双栏滚动与引用定位 / 登录多用户 / 引用框列内精确 / 开放式召回\n- [ ] 写明本轮范围口径变化及原因\n- [ ] 写明未达成项与降级执行情况，每条带理由\n- [ ] P7 复核留痕\n\n### 依赖 / 文件\n- 依赖：全部功能卡\n- 文件：`docs/Beta出口条件.md`\n\n### 不做\n- 不写「全部达成」这类无法验证的结论"
+  },
+  {
+    "no": 128,
+    "title": "[文档] Beta 演示脚本 + 一次彩排",
+    "assignee": "lin612320",
+    "milestone": "Beta-W4",
+    "labels": [
+      "beta",
+      "docs",
+      "p1",
+      "epic:B19"
+    ],
+    "body": "### 交付物\n可照读的演示脚本（分步、带时长）+ 一次完整彩排记录。\n\n### 验收\n- [ ] 覆盖：登录 → 上传 → 双栏阅读 → 提问 → 点引用 → 检索导入\n- [ ] 每步写明「点哪里、看到什么」，不写实现细节\n- [ ] 彩排跑通一次，卡点记下来\n\n### 依赖 / 文件\n- 依赖：#57\n- 文件：`docs/验收走查/`\n\n### 不做\n- 不录演示视频（RC 范畴）"
+  },
+  {
+    "no": 123,
+    "title": "[前端] 引用框三态样式统一 + 双栏虚线框图例",
+    "assignee": "star675411",
+    "milestone": "Beta-W1",
+    "labels": [
+      "beta",
+      "frontend",
+      "p2",
+      "epic:B03"
+    ],
+    "body": "### 交付物\n三种引用框状态视觉统一：精确=实线、整块=虚线、无坐标=只闪页；界面上有图例说明。\n\n### 验收\n- [ ] 三态样式在 50%/100%/200% 缩放下都不糊、不偏移\n- [ ] 图例能让人看懂「虚线代表这是整段范围」\n- [ ] 不改变现有 `bboxMode` 三态语义\n\n### 依赖 / 文件\n- 依赖：无（纯样式，可先做）\n- 文件：`frontend/src/views/ReaderView.vue`（样式段）\n\n### 不做\n- 不改定位算法（那是 #62）"
+  },
+  {
+    "no": 124,
+    "title": "[前端] 长论文首屏渲染优化（>50 页 ≤3 秒）",
+    "assignee": "star675411",
+    "milestone": "Beta-W1",
+    "labels": [
+      "beta",
+      "frontend",
+      "p2",
+      "epic:B02"
+    ],
+    "body": "### 交付物\n大文档首屏可见时间降到 3 秒内。\n\n### 验收\n- [ ] 50 页以上论文，首屏（第 1 页可读）≤3 秒\n- [ ] 不改变「先渲染全部页」的既有行为，只优化首屏优先级\n- [ ] 单栏/双栏都不出现白屏\n\n### 依赖 / 文件\n- 依赖：无\n- 文件：`frontend/src/views/ReaderView.vue`\n\n### 不做\n- 不引入虚拟滚动（改动过大，留 RC）"
+  },
+  {
+    "no": 75,
+    "title": "[前端] 双栏页「当前栏」判定",
+    "assignee": "star675411",
+    "milestone": "Beta-W2",
+    "labels": [
+      "beta",
+      "frontend",
+      "p1",
+      "epic:B02"
+    ],
+    "body": "### 交付物\n双栏页滚动时，系统知道用户在看左栏还是右栏，页码与进度不再来回跳。\n\n### 验收\n- [ ] 判据用「阅读顺序里最后可见的块」，不用页\n- [ ] 双栏论文连续滚动，页码/进度单调不跳\n- [ ] 单栏论文行为不变\n\n### 依赖 / 文件\n- 依赖：#81（reading_order 落库）\n- 文件：`frontend/src/views/ReaderView.vue`\n\n### 不做\n- 不做页面重排（PDF 是排版文件，重排等于重做版面引擎）"
+  },
+  {
+    "no": 76,
+    "title": "[前端] 引用块级跳转",
+    "assignee": "star675411",
+    "milestone": "Beta-W2",
+    "labels": [
+      "beta",
+      "frontend",
+      "p1",
+      "epic:B02"
+    ],
+    "body": "### 交付物\n点引用直接滚到那段话所在位置，而不是页面顶部。\n\n### 验收\n- [ ] 目标位置 = `页元素顶 + bboxY0 × 页高 − 40px`\n- [ ] 跳完那段话落在视口内（上下不超过半屏）\n- [ ] 页码非法时只提示，不滚动\n\n### 依赖 / 文件\n- 依赖：#81\n- 文件：`frontend/src/views/ReaderView.vue`\n\n### 不做\n- 不改 `bboxMode` 三态语义"
+  },
+  {
+    "no": 77,
+    "title": "[前端] 缩放 50%/200% 定位重算",
+    "assignee": "star675411",
+    "milestone": "Beta-W2",
+    "labels": [
+      "beta",
+      "frontend",
+      "p1",
+      "epic:B02"
+    ],
+    "body": "### 交付物\n缩放后引用框与滚动定位仍然对齐。\n\n### 验收\n- [ ] 50% / 100% / 200% 三档，引用框都套在目标段落上\n- [ ] 缩放时用现有 `captureAnchor` / `restoreAnchor` 机制，不另造一套\n- [ ] 缩放不触发整页闪白\n\n### 依赖 / 文件\n- 依赖：#62\n- 文件：`frontend/src/views/ReaderView.vue`\n\n### 不做\n- 不改缩放上下限（0.6–2.4 保持）"
+  },
+  {
+    "no": 79,
+    "title": "[前端] 双栏 10 题框套准 + 旋转页对齐",
+    "assignee": "star675411",
+    "milestone": "Beta-W3",
+    "labels": [
+      "beta",
+      "frontend",
+      "p1",
+      "epic:B03"
+    ],
+    "body": "### 交付物\n双栏引用框套准的实测结论。\n\n### 验收\n- [ ] 双栏 10 道题，`precise` 命中 ≥7，其余允许 `block`\n- [ ] 框不跨栏（x0/x1 落在同一栏区间）\n- [ ] 旋转 90°/180°/270° 页仍对齐（沿用 F6-08 样本）\n\n### 依赖 / 文件\n- 依赖：#83\n- 文件：`docs/测试/`\n\n### 不做\n- 不承诺逐句/逐字级定位"
+  },
+  {
+    "no": 126,
+    "title": "[前端] 扫描件提示（无文字层明确提示需 OCR）",
+    "assignee": "hexag0n1",
+    "milestone": "Beta-W1",
+    "labels": [
+      "beta",
+      "frontend",
+      "p2",
+      "epic:B05"
+    ],
+    "body": "### 交付物\n上传扫描件后，界面明确说明「该 PDF 无文字层，暂不支持，需 OCR」，而不是含糊的解析失败。\n\n### 验收\n- [ ] 依据后端 `parseError` 里的无文字层标识展示对应中文提示\n- [ ] 提示里给出下一步建议（换带文字层的 PDF）\n- [ ] 不影响正常论文的解析流程\n\n### 依赖 / 文件\n- 依赖：无（先按现有 `parseError` 文案做）\n- 文件：`frontend/src/views/UploadView.vue`、`frontend/src/views/LibraryView.vue`\n\n### 不做\n- 不做 OCR（明确在本轮范围外）"
+  },
+  {
+    "no": 92,
+    "title": "[前端] 登录/注册页静态稿 + 表单校验",
+    "assignee": "hexag0n1",
+    "milestone": "Beta-W1",
+    "labels": [
+      "beta",
+      "frontend",
+      "p1",
+      "epic:B08"
+    ],
+    "body": "### 交付物\n登录页与注册页的界面与本地校验（不接接口）。\n\n### 验收\n- [ ] 用户名/密码必填、长度与字符校验，错误提示中文\n- [ ] 登录与注册可互相跳转\n- [ ] 布局与现有页面风格一致（不新造一套样式）\n\n### 依赖 / 文件\n- 依赖：无（接口未就绪也能做）\n- 文件：`frontend/src/views/`（新增 LoginView/RegisterView）、`frontend/src/router/index.js`\n\n### 不做\n- 不做找回密码、验证码"
+  },
+  {
+    "no": 102,
+    "title": "[前端] 划词低质输入拦截",
+    "assignee": "hexag0n1",
+    "milestone": "Beta-W2",
+    "labels": [
+      "beta",
+      "frontend",
+      "p2",
+      "epic:B12"
+    ],
+    "body": "### 交付物\n空白、单字母、纯数字不再弹翻译浮层。\n\n### 验收\n- [ ] 三类低质输入均不弹浮层\n- [ ] 正常选词行为不变\n- [ ] F7-04 用例状态由「不适用」改判「通过」\n\n### 依赖 / 文件\n- 依赖：#53（契约补明文规则，先有条款再改代码）\n- 文件：`frontend/src/views/ReaderView.vue`（选区处理段）\n\n### 不做\n- 不改后端截断逻辑（逻辑下沉后端是 D18 的决定，不回退）"
+  },
+  {
+    "no": 93,
+    "title": "[前端] 路由守卫 + 登录后回原页",
+    "assignee": "hexag0n1",
+    "milestone": "Beta-W2",
+    "labels": [
+      "beta",
+      "frontend",
+      "p1",
+      "epic:B08"
+    ],
+    "body": "### 交付物\n未登录访问受保护页自动跳登录，登录后回到原目标页。\n\n### 验收\n- [ ] 未登录访问 `/library`、`/reader/:id` 跳 `/login`\n- [ ] 登录成功回到原本要看的页面（不是首页）\n- [ ] 白名单页面（登录/注册）不被拦截\n\n### 依赖 / 文件\n- 依赖：#72（登录接口）\n- 文件：`frontend/src/router/index.js`\n\n### 不做\n- 不做权限分级（本轮只有单一用户角色）"
+  },
+  {
+    "no": 94,
+    "title": "[前端] token 持久化（刷新不掉线）",
+    "assignee": "hexag0n1",
+    "milestone": "Beta-W3",
+    "labels": [
+      "beta",
+      "frontend",
+      "p1",
+      "epic:B08"
+    ],
+    "body": "### 交付物\n刷新页面保持登录态。\n\n### 验收\n- [ ] token 持久化后刷新不掉线\n- [ ] 登出后 token 被清除干净\n- [ ] 多个标签页共享登录态\n\n### 依赖 / 文件\n- 依赖：#68\n- 文件：`frontend/src/composables/`（新增鉴权状态）、`frontend/src/api/papers.js`\n\n### 不做\n- 不做「记住我」、「自动续期」（RC 再看）"
+  },
+  {
+    "no": 129,
+    "title": "[前端] 401 自动登出 + 统一错误提示",
+    "assignee": "hexag0n1",
+    "milestone": "Beta-W3",
+    "labels": [
+      "beta",
+      "frontend",
+      "p1",
+      "epic:B08"
+    ],
+    "body": "### 交付物\n任何接口返回 401 时自动登出并给出中文提示，不白屏。\n\n### 验收\n- [ ] 401 → 清 token → 跳登录页 → 提示「登录已失效」\n- [ ] 不出现裸露报错或白屏\n- [ ] 与现有空状态/异常提示组件统一\n\n### 依赖 / 文件\n- 依赖：#69\n- 文件：`frontend/src/api/papers.js`、`frontend/src/router/index.js`\n\n### 不做\n- 不做自动重试"
+  },
+  {
+    "no": 85,
+    "title": "[后端] JwtFilter + 401 拦截 + 错误码落位",
+    "assignee": "Linyuue",
+    "milestone": "Beta-W2",
+    "labels": [
+      "beta",
+      "backend",
+      "p1",
+      "epic:B06"
+    ],
+    "body": "### 交付物\n请求进入业务前统一验签的拦截器，以及错误码字典落位。\n\n### 验收\n- [ ] 无 token / 假 token / 篡改签名 → 401\n- [ ] 验签通过后把 user_id 放进请求上下文供后续使用\n- [ ] 6001/6002 加入 `ErrorCode` 并与契约一致\n\n### 依赖 / 文件\n- 依赖：#87（users 表）\n- 文件：`backend/src/main/java/com/papermind/backend/`（JwtFilter、ErrorCode）\n\n### 不做\n- 不做接口级权限分级"
+  },
+  {
+    "no": 86,
+    "title": "[后端] 注册 + 登录 + bcrypt + 签发",
+    "assignee": "Linyuue",
+    "milestone": "Beta-W2",
+    "labels": [
+      "beta",
+      "backend",
+      "p1",
+      "epic:B06"
+    ],
+    "body": "### 交付物\n注册与登录两个接口，密码 bcrypt 入库，登录成功签发 JWT。\n\n### 验收\n- [ ] `POST /api/auth/register`：用户名唯一，密码 bcrypt 入库\n- [ ] `POST /api/auth/login`：校验通过后签发 token，返回有效期\n- [ ] 响应走统一 ApiResponse，`code=0`\n\n### 依赖 / 文件\n- 依赖：#71\n- 文件：`backend/.../controller/AuthController.java`、`service/`\n\n### 不做\n- 不做找回密码、验证码、第三方登录"
+  },
+  {
+    "no": 88,
+    "title": "[后端] 登录安全自查",
+    "assignee": "Linyuue",
+    "milestone": "Beta-W2",
+    "labels": [
+      "beta",
+      "backend",
+      "p1",
+      "epic:B06"
+    ],
+    "body": "### 交付物\n一份安全自查结论 + 必要的修正。\n\n### 验收\n- [ ] 密码不落明文、不出现在任何日志里\n- [ ] 账号不存在与密码错误返回同一错误码\n- [ ] 篡改签名/过期 token 均被拒\n- [ ] 自查结论写进 issue 评论\n\n### 依赖 / 文件\n- 依赖：#72\n- 文件：`backend/`\n\n### 不做\n- 不做渗透测试"
+  },
+  {
+    "no": 89,
+    "title": "[后端] papers 四处过滤（列表/详情/删除/取文件）",
+    "assignee": "Linyuue",
+    "milestone": "Beta-W3",
+    "labels": [
+      "beta",
+      "backend",
+      "p1",
+      "epic:B07"
+    ],
+    "body": "### 交付物\n文献相关接口全部按 token 的 user_id 过滤。\n\n### 验收\n- [ ] 列表、详情、删除、取文件四处都只操作本人数据\n- [ ] 访问他人 paper_id 返回统一越权口径（不泄露存在性）\n- [ ] 取文件接口不能绕过过滤读到别人的 PDF\n\n### 依赖 / 文件\n- 依赖：#72\n- 文件：`backend/.../controller/PaperController.java`\n\n### 不做\n- 不做共享库"
+  },
+  {
+    "no": 90,
+    "title": "[后端] qa + explain + import 三处过滤 + 越权口径统一",
+    "assignee": "Linyuue",
+    "milestone": "Beta-W3",
+    "labels": [
+      "beta",
+      "backend",
+      "p1",
+      "epic:B07"
+    ],
+    "body": "### 交付物\n问答、划词解释、检索导入三处按用户过滤，越权口径全项目统一。\n\n### 验收\n- [ ] 问答与 explain 只能作用于本人论文\n- [ ] 导入的文献归属当前用户\n- [ ] 越权响应**只准一种**（403 或 2001），与 #53 契约一致\n\n### 依赖 / 文件\n- 依赖：#74\n- 文件：`backend/.../controller/QaController.java`、`ExplainController.java`、`service/PaperImportService.java`\n\n### 不做\n- 不改 Prompt 与检索逻辑（P5 地盘）"
+  },
+  {
+    "no": 106,
+    "title": "[后端] 检索双源并发调用 + 结果合并",
+    "assignee": "Linyuue",
+    "milestone": "Beta-W3",
+    "labels": [
+      "beta",
+      "backend",
+      "p1",
+      "epic:B14"
+    ],
+    "body": "### 交付物\n一次请求同时查 arXiv 与 OpenAlex，结果合并返回。\n\n### 验收\n- [ ] 两源并发调用，整体耗时不超过单源的两倍\n- [ ] 合并结果保留每条原本的 `source`\n- [ ] 任一源失败不影响另一源结果（带 `degraded`）\n\n### 依赖 / 文件\n- 依赖：#53\n- 文件：`backend/.../controller/SearchController.java`、`service/ArxivClient.java`、`OpenAlexClient.java`\n\n### 不做\n- 不做 Semantic Scholar 第三源"
+  },
+  {
+    "no": 107,
+    "title": "[后端] 三级去重 + 稳定排序",
+    "assignee": "Linyuue",
+    "milestone": "Beta-W3",
+    "labels": [
+      "beta",
+      "backend",
+      "p2",
+      "epic:B14"
+    ],
+    "body": "### 交付物\n合并结果去重与稳定排序。\n\n### 验收\n- [ ] 去重三级：DOI → arxiv_id → 标题+年份\n- [ ] 同一 query 连续两次结果次序**完全一致**\n- [ ] 响应仍带 `degraded` / `cached`（BUG-017 修过的不许回退）\n\n### 依赖 / 文件\n- 依赖：#76\n- 文件：`backend/.../controller/SearchController.java`\n\n### 不做\n- 不做个性化排序"
+  },
+  {
+    "no": 109,
+    "title": "[后端] 非 arXiv 来源导入打通（含 source 枚举冲突修复）",
+    "assignee": "Linyuue",
+    "milestone": "Beta-W3",
+    "labels": [
+      "beta",
+      "backend",
+      "p2",
+      "epic:B14"
+    ],
+    "body": "### 交付物\nOpenAlex 或纯 PDF 直链来源也能导入成功。\n\n### 验收\n- [ ] `PaperImportService` 不再写 `source='import'`（该值不在 CHECK 白名单里，会撞约束被兜成 5000）\n- [ ] `source` 取上游 origin，或与契约把枚举写死\n- [ ] 非 arXiv 来源导入成功，并出现在文献列表\n\n### 依赖 / 文件\n- 依赖：#77\n- 文件：`backend/.../service/PaperImportService.java`、`docs/03-数据库表结构.sql`\n\n### 不做\n- 不绕过付费墙，非 OA 只给原文链接\n\n> Alpha 没暴露：前端只开了 arXiv 选项，OpenAlex 只测了检索没测导入。"
+  },
+  {
+    "no": 71,
+    "title": "[AI] 通栏块识别 + 切带（_split_bands）",
+    "assignee": "Cheongfan",
+    "milestone": "Beta-W1",
+    "labels": [
+      "beta",
+      "ai",
+      "p1",
+      "epic:B01"
+    ],
+    "body": "### 交付物\n把一页按「横跨整页的块」切成若干横带（band）。\n\n### 验收\n- [ ] 宽度 > 页宽 75% 的块判定为通栏块，单独成带\n- [ ] 通栏块之间的区域形成独立带，带序从上到下\n- [ ] 单栏页走原逻辑，行为不变\n\n### 依赖 / 文件\n- 依赖：#52（契约字段）\n- 文件：`ai-service/app/services/chunker.py`\n\n### 不做\n- 不改抽取（`pdf_extractor.py`）\n- 不碰切片文本规则（700 字上限、100 字重叠）"
+  },
+  {
+    "no": 72,
+    "title": "[AI] 栏间空白检测（0.35–0.65 投影法）",
+    "assignee": "Cheongfan",
+    "milestone": "Beta-W1",
+    "labels": [
+      "beta",
+      "ai",
+      "p1",
+      "epic:B01"
+    ],
+    "body": "### 交付物\n在带内自动找出栏间竖缝（gutter）的位置。\n\n### 验收\n- [ ] 把所有块的 [x0,x1] 投影到横轴，统计覆盖次数\n- [ ] 在 0.35–0.65 区间找覆盖最少的 x 作为 gutter\n- [ ] 覆盖次数接近 0 才认（否则判为单栏）\n\n### 依赖 / 文件\n- 依赖：#79\n- 文件：`ai-service/app/services/chunker.py`\n\n### 不做\n- 不写死 x=0.5（对不齐的期刊会切错）"
+  },
+  {
+    "no": 73,
+    "title": "[AI] (band, column, y, x) 排序 + 写 reading_order",
+    "assignee": "Cheongfan",
+    "milestone": "Beta-W2",
+    "labels": [
+      "beta",
+      "ai",
+      "p1",
+      "epic:B01"
+    ],
+    "body": "### 交付物\n按阅读顺序重排块，并把顺序写进 `chunks.reading_order`。\n\n### 验收\n- [ ] 排序键为 `(band, column, y0, x0)`，跨栏块（column=-1）排本带末尾\n- [ ] chunk 的 `reading_order` 取其首块的 order\n- [ ] 落库字段与契约一致\n\n### 依赖 / 文件\n- 依赖：#80\n- 文件：`ai-service/app/services/chunker.py`、`ai-service/app/db/chunks.py`\n\n### 不做\n- 不改块内文字内容，只改顺序"
+  },
+  {
+    "no": 74,
+    "title": "[AI] 基线回归 + 3 篇双栏验证 + check_reading_order.py",
+    "assignee": "Cheongfan",
+    "milestone": "Beta-W2",
+    "labels": [
+      "beta",
+      "ai",
+      "p1",
+      "epic:B01"
+    ],
+    "body": "### 交付物\n证明「没顺手改坏单栏」的回归结论 + 一个可复跑的对比脚本。\n\n### 验收\n- [ ] 单栏论文跑 `check_chunker.py`，基线哈希**完全一致**\n- [ ] 3 篇双栏论文抽 5 段，人工确认段落连贯、无跨栏拼接\n- [ ] 新增 `check_reading_order.py`，打印重排前后顺序对比\n\n### 依赖 / 文件\n- 依赖：#81\n- 文件：`ai-service/scripts/check_reading_order.py`\n\n### 不做\n- 三栏/异形版面不做，标 `layout=unknown`\n\n> ⛔ 硬卡点：本条不完成，P2 的三条与 #86 全部阻塞。"
+  },
+  {
+    "no": 78,
+    "title": "[AI] 按 column 取主栏 bbox，标 precise/block",
+    "assignee": "Cheongfan",
+    "milestone": "Beta-W3",
+    "labels": [
+      "beta",
+      "ai",
+      "p1",
+      "epic:B03"
+    ],
+    "body": "### 交付物\n双栏 chunk 的引用框收窄到单栏内，并按情况标 `precise` 或 `block`。\n\n### 验收\n- [ ] chunk 内块按 column 分组，取块数最多的一栏做 bbox 并集\n- [ ] 块均匀分布在两栏或含跨栏块时，仍标 `block`\n- [ ] 单栏内 ≥60% 块时标 `precise`\n\n### 依赖 / 文件\n- 依赖：#81\n- 文件：`ai-service/app/services/chunker.py`\n\n### 不做\n- 不承诺逐句精确"
+  },
+  {
+    "no": 97,
+    "title": "[AI] 概览类识别 + 放宽检索路径",
+    "assignee": "Cheongfan",
+    "milestone": "Beta-W2",
+    "labels": [
+      "beta",
+      "ai",
+      "p2",
+      "epic:B10"
+    ],
+    "body": "### 交付物\n问「这篇讲了什么」能答出概括，而不是回「本文未涉及」。\n\n### 验收\n- [ ] 能识别概览类问题（讲了什么/解决什么问题/贡献/数据/结论）\n- [ ] 概览类放宽 top_k 到 8，并优先纳入首段、末段、摘要附近段\n- [ ] 未涉及题仍拒答，不放宽这道门\n\n### 依赖 / 文件\n- 依赖：无\n- 文件：`ai-service/app/services/RAG.py`\n\n### 不做\n- 不做多轮对话记忆、不换模型\n\n> 根因：`top_k=3` + 相似度阈值 0.35 + prompt「字面相关也算未涉及」三处叠加。"
+  },
+  {
+    "no": 99,
+    "title": "[AI] 召回回归三组",
+    "assignee": "Cheongfan",
+    "milestone": "Beta-W2",
+    "labels": [
+      "beta",
+      "ai",
+      "p2",
+      "epic:B10"
+    ],
+    "body": "### 交付物\n改动前后三组对照结论。\n\n### 验收\n- [ ] 新增 5 道概览题命中 ≥4\n- [ ] Alpha 原 10 题不退步（仍 ≥9/10）\n- [ ] 未涉及 3 题仍 100% 拒答\n\n### 依赖 / 文件\n- 依赖：#84\n- 文件：`ai-service/scripts/eval_qa.py`、`docs/测试/`\n\n### 不做\n- 不改题库判定口径（沿用 `命中率判定口径.md`）"
+  },
+  {
+    "no": 100,
+    "title": "[AI] 引用片段截断与碎片过滤",
+    "assignee": "Cheongfan",
+    "milestone": "Beta-W3",
+    "labels": [
+      "beta",
+      "ai",
+      "p2",
+      "epic:B11"
+    ],
+    "body": "### 交付物\n引用片段是整句话，不是从词中间切断的半句。\n\n### 验收\n- [ ] 按段落边界截断，结尾落在句末或段末\n- [ ] 标题/表格/公式碎片不作为引用首句\n- [ ] 抽 10 条验证：词中截断 0 条\n\n### 依赖 / 文件\n- 依赖：#81\n- 文件：`ai-service/app/services/RAG.py`\n\n### 不做\n- 不做逐句对齐、不改 chunk 大小上限"
+  },
+  {
+    "no": 82,
+    "title": "[数据] 建 users 表 + 外键 + 建表语句升 1.1.0",
+    "assignee": "lzzzzzasd",
+    "milestone": "Beta-W1",
+    "labels": [
+      "beta",
+      "data",
+      "p1",
+      "epic:B05"
+    ],
+    "body": "### 交付物\n`users` 表 + `papers.user_id` 外键 + 表结构文档升级。\n\n### 验收\n- [ ] `users` 表：id / username（唯一）/ password_hash / created_at\n- [ ] `papers.user_id` 指向 `users(id)`\n- [ ] 建表语句与 `ALTER` 都写进 `docs/03-数据库表结构.sql`，版本升 1.1.0-frozen\n\n### 依赖 / 文件\n- 依赖：#51（契约 auth 接口）\n- 文件：`docs/03-数据库表结构.sql`\n\n### 不做\n- 不动 chunks / annotation / reading_session 结构\n\n> ⚠️ initdb 目录只在新库首次启动执行：**存量库必须单独跑 ALTER**，否则重演 BUG-019。"
+  },
+  {
+    "no": 83,
+    "title": "[数据] 迁移脚本（存量归 user_id=1，幂等）+ 存量库实测",
+    "assignee": "lzzzzzasd",
+    "milestone": "Beta-W1",
+    "labels": [
+      "beta",
+      "data",
+      "p1",
+      "epic:B05"
+    ],
+    "body": "### 交付物\n可重复执行的迁移脚本 + 在存量库上跑通的记录。\n\n### 验收\n- [ ] 存量论文全部归属 legacy 用户 `user_id=1`\n- [ ] 脚本**幂等**：跑一次与跑三次结果一致、不报错\n- [ ] 在真实存量库上实测并留输出\n\n### 依赖 / 文件\n- 依赖：#87\n- 文件：`scripts/`（新增迁移脚本）\n\n### 不做\n- 不重建数据库、不删卷"
+  },
+  {
+    "no": 84,
+    "title": "[数据] 旧论文回归（打开 + 提问 + 删除）",
+    "assignee": "lzzzzzasd",
+    "milestone": "Beta-W1",
+    "labels": [
+      "beta",
+      "data",
+      "p1",
+      "epic:B05"
+    ],
+    "body": "### 交付物\n迁移后旧数据可用的结论。\n\n### 验收\n- [ ] 迁移前上传的论文能打开、能提问、能删除\n- [ ] 页数/切片数与迁移前一致\n- [ ] 结论写进 issue 评论\n\n### 依赖 / 文件\n- 依赖：#88\n- 文件：`docs/验收走查/`\n\n### 不做\n- 不改业务代码\n\n> ⛔ 硬卡点：本条不完成，P4 的登录相关四条全部阻塞。"
+  },
+  {
+    "no": 112,
+    "title": "[部署] 三端构建 workflow",
+    "assignee": "lzzzzzasd",
+    "milestone": "Beta-W2",
+    "labels": [
+      "beta",
+      "deploy",
+      "p2",
+      "epic:B16"
+    ],
+    "body": "### 交付物\n`.github/workflows/ci.yml` 的构建阶段。\n\n### 验收\n- [ ] 后端 `mvn -B package`、前端 `npm ci && npm run build`、ai-service 依赖安装三条 job\n- [ ] PR 与 master push 都触发\n- [ ] 错误日志可读，失败能定位到哪一步\n\n### 依赖 / 文件\n- 依赖：#53\n- 文件：`.github/workflows/ci.yml`\n\n### 不做\n- 不做自动部署"
+  },
+  {
+    "no": 113,
+    "title": "[部署] 单测 + ai-service 脚本自检 job",
+    "assignee": "lzzzzzasd",
+    "milestone": "Beta-W2",
+    "labels": [
+      "beta",
+      "deploy",
+      "p2",
+      "epic:B16"
+    ],
+    "body": "### 交付物\nCI 中的测试阶段。\n\n### 验收\n- [ ] 后端单测纳入 CI\n- [ ] ai-service 的 `check_chunker.py` 等自检脚本纳入 CI\n- [ ] 任何一步失败，PR 显示红灯\n\n### 依赖 / 文件\n- 依赖：#90\n- 文件：`.github/workflows/ci.yml`\n\n### 不做\n- 不做覆盖率门禁"
+  },
+  {
+    "no": 114,
+    "title": "[部署] PR 模板 + 故意提坏 PR 验证真被拦住",
+    "assignee": "lzzzzzasd",
+    "milestone": "Beta-W3",
+    "labels": [
+      "beta",
+      "deploy",
+      "p2",
+      "epic:B16"
+    ],
+    "body": "### 交付物\nPR 模板 + 一次「红灯拦截」的实证。\n\n### 验收\n- [ ] PR 模板含「本地已跑通 / 已在容器 8081 验证」勾选项\n- [ ] 故意提一个构建失败的 PR，**确实被拦住**并留截图\n- [ ] 结论写进 issue 评论\n\n### 依赖 / 文件\n- 依赖：#91\n- 文件：`.github/`\n\n### 不做\n- 不设分支保护强制规则（按现有多分支约定）"
+  },
+  {
+    "no": 115,
+    "title": "[部署] backup.ps1（不备 hf-cache）",
+    "assignee": "lzzzzzasd",
+    "milestone": "Beta-W3",
+    "labels": [
+      "beta",
+      "deploy",
+      "p2",
+      "epic:B17"
+    ],
+    "body": "### 交付物\n一条命令备份数据库与上传文件。\n\n### 验收\n- [ ] 备份 PostgreSQL 数据与 `uploads` 卷\n- [ ] **明确不备份 `hf-cache`**（2.2GB 模型），原因写进脚本注释\n- [ ] 备份产物有明确命名与时间戳\n\n### 依赖 / 文件\n- 依赖：无\n- 文件：`scripts/backup.ps1`\n\n### 不做\n- 不做定时任务、不做异地存储"
+  },
+  {
+    "no": 116,
+    "title": "[部署] restore.ps1 + 实测还原一次",
+    "assignee": "lzzzzzasd",
+    "milestone": "Beta-W3",
+    "labels": [
+      "beta",
+      "deploy",
+      "p2",
+      "epic:B17"
+    ],
+    "body": "### 交付物\n还原脚本 + 一次真实还原记录。\n\n### 验收\n- [ ] 还原后文献列表与问答均可用\n- [ ] **实测还原一次**并留命令输出（没实测等于没做）\n- [ ] 还原步骤写进 `scripts/README.md`\n\n### 依赖 / 文件\n- 依赖：#93\n- 文件：`scripts/restore.ps1`、`scripts/README.md`\n\n### 不做\n- 不碰 `docker compose down -v`"
+  },
+  {
+    "no": 120,
+    "title": "[测试] Beta 用例表 v1.0 起草",
+    "assignee": "xingniansky",
+    "milestone": "Beta-W1",
+    "labels": [
+      "beta",
+      "test",
+      "p1",
+      "epic:B20"
+    ],
+    "body": "### 交付物\n覆盖 51 条子单验收点的 Beta 用例表初版。\n\n### 验收\n- [ ] 每个功能卡至少 2 条用例，含正常/异常/边界\n- [ ] 用例格式沿用 `冒烟用例表-Alpha延展段.md`\n- [ ] 每条用例写明判定标准（可勾选）\n\n### 依赖 / 文件\n- 依赖：无\n- 文件：`docs/测试/冒烟用例表-Beta.md`\n\n### 不做\n- 不测压测与并发（RC 范畴）\n\n> 提前到 W1 做，避免像 Alpha 一样压到最后三天。"
+  },
+  {
+    "no": 117,
+    "title": "[测试] 检索降级用例：超时 / 断网",
+    "assignee": "xingniansky",
+    "milestone": "Beta-W2",
+    "labels": [
+      "beta",
+      "test",
+      "p2",
+      "epic:B18"
+    ],
+    "body": "### 交付物\n两类异常的用户可见行为结论。\n\n### 验收\n- [ ] 外部接口超时：界面提示「数据源暂不可用」，不是空白\n- [ ] 断网：有缓存给缓存+更新时间，无缓存明确说是网络问题\n- [ ] 两条用例均有结论，无空白格\n\n### 依赖 / 文件\n- 依赖：现有单源检索即可测，可提前\n- 文件：`docs/测试/冒烟用例表-Beta.md`\n\n### 不做\n- 不做压测"
+  },
+  {
+    "no": 118,
+    "title": "[测试] 检索降级用例：缓存过期 / 429",
+    "assignee": "xingniansky",
+    "milestone": "Beta-W2",
+    "labels": [
+      "beta",
+      "test",
+      "p2",
+      "epic:B18"
+    ],
+    "body": "### 交付物\n缓存与限流两类异常结论。\n\n### 验收\n- [ ] 缓存过期：重新请求，不报错\n- [ ] 429 限流：明确提示，不是转圈到死\n- [ ] 前端文案与 `degraded` 标记一致\n\n### 依赖 / 文件\n- 依赖：#96\n- 文件：`docs/测试/冒烟用例表-Beta.md`\n\n### 不做\n- 不做限流加固"
+  },
+  {
+    "no": 95,
+    "title": "[测试] 多用户隔离 9 条交叉用例",
+    "assignee": "xingniansky",
+    "milestone": "Beta-W3",
+    "labels": [
+      "beta",
+      "test",
+      "p1",
+      "epic:B09"
+    ],
+    "body": "### 交付物\nA/B 双账号交叉越权的实测结论。\n\n### 验收\n- [ ] 9 条交叉用例（列表/详情/删除/问答/explain/取文件/导入 等）全部被拒\n- [ ] 在**容器环境 8081**执行\n- [ ] 每条带结论\n\n### 依赖 / 文件\n- 依赖：#75、#70\n- 文件：`docs/测试/冒烟用例表-Beta.md`\n\n### 不做\n- 不改代码，只提 Issue"
+  },
+  {
+    "no": 96,
+    "title": "[测试] 隔离结果入用例表 + 异常挂 BugList",
+    "assignee": "xingniansky",
+    "milestone": "Beta-W3",
+    "labels": [
+      "beta",
+      "test",
+      "p1",
+      "epic:B09"
+    ],
+    "body": "### 交付物\n隔离验收的归档记录。\n\n### 验收\n- [ ] 9 条结果写进用例表\n- [ ] 任何异常挂 `BugList.md`，带复现步骤\n- [ ] 无「无原因空白」\n\n### 依赖 / 文件\n- 依赖：#98\n- 文件：`docs/测试/BugList.md`\n\n### 不做\n- 不改代码"
+  },
+  {
+    "no": 121,
+    "title": "[测试] Beta 测试报告（每条带证据来源）",
+    "assignee": "xingniansky",
+    "milestone": "Beta-W4",
+    "labels": [
+      "beta",
+      "test",
+      "p1",
+      "epic:B20"
+    ],
+    "body": "### 交付物\n`docs/测试/测试报告-Beta.md`。\n\n### 验收\n- [ ] 范围、环境、方法、结论齐全\n- [ ] 每条结论带证据（截图/日志/命令输出）\n- [ ] 数字只有一个来源，并写明来自哪个文件\n\n### 依赖 / 文件\n- 依赖：全部功能卡\n- 文件：`docs/测试/测试报告-Beta.md`\n\n### 不做\n- 不另起一套口径"
+  },
+  {
+    "no": 122,
+    "title": "[文档] Scrum 博客 + BugList 升版 + 用例表定稿",
+    "assignee": "xingniansky",
+    "milestone": "Beta-W4",
+    "labels": [
+      "beta",
+      "docs",
+      "p1",
+      "epic:B20"
+    ],
+    "body": "### 交付物\nBeta 阶段的 Scrum 博客与文档定稿。\n\n### 验收\n- [ ] 博客四要素齐全（每人工作+链接、燃尽图、例会照片、签入记录）\n- [ ] `BugList.md` 升版，S0/S1 全部有处置\n- [ ] 用例表转为最终版\n\n### 依赖 / 文件\n- 依赖：#100\n- 文件：`docs/blog/`、`docs/测试/BugList.md`\n\n### 不做\n- 不做演示视频（RC）"
+  }
 ]

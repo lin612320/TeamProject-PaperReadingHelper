@@ -40,11 +40,11 @@ W1 与 W4 各只有 5 天，所以**契约必须早冻、报告不能压到最�
 
 ## 二、每人明细
 
-### P1 林子航 · **8 条**（全部不写代码）
+### P1 林子航 · **8 条**
 
 | Issue | 标题 | 参考日期 |
 |---|---|---|
-| [#51](https://github.com/lin612320/TeamProject-PaperReadingHelper/issues/51) | [契约] auth 四接口 + 错误码 4001/4002 | 11-18 → 11-19 |
+| [#51](https://github.com/lin612320/TeamProject-PaperReadingHelper/issues/51) | [契约] auth 四接口 + 错误码 6001-6003 | 11-18 → 11-19 |
 | [#52](https://github.com/lin612320/TeamProject-PaperReadingHelper/issues/52) | [契约] `chunks.reading_order` + `citations` 字段 | 11-19 |
 | [#53](https://github.com/lin612320/TeamProject-PaperReadingHelper/issues/53) | [契约] 划词拦截规则 + 越权口径 + 冻结 1.3.0 | 11-19 |
 | [#54](https://github.com/lin612320/TeamProject-PaperReadingHelper/issues/54) | [契约] 实现与契约逐字段对账 | 11-20 → 11-21 |

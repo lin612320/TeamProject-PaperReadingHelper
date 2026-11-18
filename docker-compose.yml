@@ -67,6 +67,9 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       APP_SEARCH_ARXIV_URL: ${APP_SEARCH_ARXIV_URL:-https://export.arxiv.org/api/query}
+      # 实测：直连 arXiv 一次约 9 秒；原先 10 秒拆两次各 5 秒，必然超时（BUG-021）
+      # 放宽到 30 秒（每次 15 秒），2026-11-18 实测可稳定返回
+      APP_SEARCH_TIMEOUT_SECONDS: ${APP_SEARCH_TIMEOUT_SECONDS:-30}
       AI_SERVICE_URL: http://ai-service:8000
     ports:
       - "8080:8080"
