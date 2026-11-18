@@ -191,8 +191,8 @@ W1（11-18→11-22）你空着（等 #87），建议先把 JWT 方案与错误�
 |---|---|
 | `frontend/src/views/ReaderView.vue` | **P2** |
 | `ai-service/app/services/chunker.py` | **P5** |
-| `docs/03-数据库表结构.sql` | **P6** |
-| `docs/01-api-contract.yaml` | **P1** |
+| `docs/契约/03-数据库表结构.sql` | **P6** |
+| `docs/契约/01-api-contract.yaml` | **P1** |
 | `docker-compose.yml` / `.github/` | **P6** |
 
 > P1 的 #55 #56 只读不改文件，不占用独占权。

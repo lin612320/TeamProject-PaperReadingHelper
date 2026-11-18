@@ -2,7 +2,7 @@
 
 > 来源：P2 杨靖 `#7 引用 bbox 坐标预研`（原 `.doc` 已转为本文件，字段名按冻结契约统一）
 > 对接双方：**P2 杨靖（前端画框/跳转）↔ P5 吴啸天（后端产出坐标）**
-> 效力：与 `docs/01-api-contract.yaml` 的 `x-conventions.coordinate` 一致，冲突时以契约为准
+> 效力：与 `docs/契约/01-api-contract.yaml` 的 `x-conventions.coordinate` 一致，冲突时以契约为准
 > 生效阶段：**Beta**（Alpha 阶段四个 bbox 字段一律返回 `null`）
 
 ---
@@ -40,7 +40,7 @@
 - `(bboxX1, bboxY1)` 是**右下角顶点**
 - 允许相等？**不允许**，宽高必须为正
 
-数据库侧对应 CHECK 约束（`docs/03-数据库表结构.sql`）：
+数据库侧对应 CHECK 约束（`docs/契约/03-数据库表结构.sql`）：
 
 ```sql
 bbox_x0 DOUBLE PRECISION CHECK (bbox_x0 BETWEEN 0 AND 1)

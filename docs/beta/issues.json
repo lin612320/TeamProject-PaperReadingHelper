@@ -10,7 +10,7 @@
       "p1",
       "epic:B13"
     ],
-    "body": "### 交付物\n契约 1.3.0 里的 auth 接口组：`POST /api/auth/register`、`POST /api/auth/login`、`GET /api/auth/me`、`POST /api/auth/logout`，以及错误码 6001（账号/密码不正确）、6002（令牌过期或无效）。\n\n### 验收\n- [ ] 四个接口的请求体、响应体、鉴权方式在契约中写全\n- [ ] 密码错与账号不存在**共用 6001**（不泄露账号是否存在）\n- [ ] 令牌过期/篡改走 6002 或 401，口径唯一\n\n### 依赖 / 文件\n- 依赖：无\n- 文件：`docs/01-api-contract.yaml`\n\n### 不做\n- 不做找回密码、短信验证、第三方登录"
+    "body": "### 交付物\n契约 1.3.0 里的 auth 接口组：`POST /api/auth/register`、`POST /api/auth/login`、`GET /api/auth/me`、`POST /api/auth/logout`，以及错误码 6001（账号/密码不正确）、6002（令牌过期或无效）。\n\n### 验收\n- [ ] 四个接口的请求体、响应体、鉴权方式在契约中写全\n- [ ] 密码错与账号不存在**共用 6001**（不泄露账号是否存在）\n- [ ] 令牌过期/篡改走 6002 或 401，口径唯一\n\n### 依赖 / 文件\n- 依赖：无\n- 文件：`docs/契约/01-api-contract.yaml`\n\n### 不做\n- 不做找回密码、短信验证、第三方登录"
   },
   {
     "no": 104,
@@ -23,7 +23,7 @@
       "p1",
       "epic:B13"
     ],
-    "body": "### 交付物\n阅读顺序字段与引用字段的契约定义。\n\n### 验收\n- [ ] `chunks.reading_order`：类型、可空性、默认值、页内从 0 起，写明\n- [ ] 问答响应 `citations[]` 增加 `readingOrder`（可空）\n- [ ] 与 P5 的产出格式、P6 的建表语句三者一致\n\n### 依赖 / 文件\n- 依赖：无\n- 文件：`docs/01-api-contract.yaml`\n\n### 不做\n- 不改动既有 bbox 四字段的语义"
+    "body": "### 交付物\n阅读顺序字段与引用字段的契约定义。\n\n### 验收\n- [ ] `chunks.reading_order`：类型、可空性、默认值、页内从 0 起，写明\n- [ ] 问答响应 `citations[]` 增加 `readingOrder`（可空）\n- [ ] 与 P5 的产出格式、P6 的建表语句三者一致\n\n### 依赖 / 文件\n- 依赖：无\n- 文件：`docs/契约/01-api-contract.yaml`\n\n### 不做\n- 不改动既有 bbox 四字段的语义"
   },
   {
     "no": 105,
@@ -36,7 +36,7 @@
       "p1",
       "epic:B13"
     ],
-    "body": "### 交付物\n契约 1.3.0-frozen 的收尾：划词低质输入拦截规则、越权返回口径、changelog。\n\n### 验收\n- [ ] 写明空白/单字母/纯数字不弹浮层（#67 的前置）\n- [ ] 越权口径**定死一个**：403 或 2001，不许并存\n- [ ] 版本升 1.3.0-frozen，changelog 写清「为什么升」\n\n### 依赖 / 文件\n- 依赖：无\n- 文件：`docs/01-api-contract.yaml`\n\n### 不做\n- 非必要不改既有字段名与错误码"
+    "body": "### 交付物\n契约 1.3.0-frozen 的收尾：划词低质输入拦截规则、越权返回口径、changelog。\n\n### 验收\n- [ ] 写明空白/单字母/纯数字不弹浮层（#67 的前置）\n- [ ] 越权口径**定死一个**：403 或 2001，不许并存\n- [ ] 版本升 1.3.0-frozen，changelog 写清「为什么升」\n\n### 依赖 / 文件\n- 依赖：无\n- 文件：`docs/契约/01-api-contract.yaml`\n\n### 不做\n- 非必要不改既有字段名与错误码"
   },
   {
     "no": 127,
@@ -49,7 +49,7 @@
       "p2",
       "epic:B13"
     ],
-    "body": "### 交付物\n一份对账结论：契约声明的字段/错误码 vs 实际实现，逐条一致或列出偏差。\n\n### 验收\n- [ ] 覆盖 papers / qa / explain / search / auth 五组接口\n- [ ] 偏差项挂 BugList，不口头带过\n- [ ] 结论写进 `docs/契约评审要点.md` 或新开一节\n\n### 依赖 / 文件\n- 依赖：#53（契约冻结后才有基准）\n- 文件：`docs/01-api-contract.yaml`、`docs/测试/BugList.md`\n\n### 不做\n- 发现偏差不改代码，只记账（改代码归各模块负责人）\n\n> Alpha 上出过 BUG-003（字段不符）、BUG-016（Key 未转发）、BUG-017（缺标记）三条同类问题。"
+    "body": "### 交付物\n一份对账结论：契约声明的字段/错误码 vs 实际实现，逐条一致或列出偏差。\n\n### 验收\n- [ ] 覆盖 papers / qa / explain / search / auth 五组接口\n- [ ] 偏差项挂 BugList，不口头带过\n- [ ] 结论写进 `docs/契约/契约评审要点.md` 或新开一节\n\n### 依赖 / 文件\n- 依赖：#53（契约冻结后才有基准）\n- 文件：`docs/契约/01-api-contract.yaml`、`docs/测试/BugList.md`\n\n### 不做\n- 发现偏差不改代码，只记账（改代码归各模块负责人）\n\n> Alpha 上出过 BUG-003（字段不符）、BUG-016（Key 未转发）、BUG-017（缺标记）三条同类问题。"
   },
   {
     "no": 80,
@@ -361,7 +361,7 @@
       "p2",
       "epic:B14"
     ],
-    "body": "### 交付物\nOpenAlex 或纯 PDF 直链来源也能导入成功。\n\n### 验收\n- [ ] `PaperImportService` 不再写 `source='import'`（该值不在 CHECK 白名单里，会撞约束被兜成 5000）\n- [ ] `source` 取上游 origin，或与契约把枚举写死\n- [ ] 非 arXiv 来源导入成功，并出现在文献列表\n\n### 依赖 / 文件\n- 依赖：#77\n- 文件：`backend/.../service/PaperImportService.java`、`docs/03-数据库表结构.sql`\n\n### 不做\n- 不绕过付费墙，非 OA 只给原文链接\n\n> Alpha 没暴露：前端只开了 arXiv 选项，OpenAlex 只测了检索没测导入。"
+    "body": "### 交付物\nOpenAlex 或纯 PDF 直链来源也能导入成功。\n\n### 验收\n- [ ] `PaperImportService` 不再写 `source='import'`（该值不在 CHECK 白名单里，会撞约束被兜成 5000）\n- [ ] `source` 取上游 origin，或与契约把枚举写死\n- [ ] 非 arXiv 来源导入成功，并出现在文献列表\n\n### 依赖 / 文件\n- 依赖：#77\n- 文件：`backend/.../service/PaperImportService.java`、`docs/契约/03-数据库表结构.sql`\n\n### 不做\n- 不绕过付费墙，非 OA 只给原文链接\n\n> Alpha 没暴露：前端只开了 arXiv 选项，OpenAlex 只测了检索没测导入。"
   },
   {
     "no": 71,
@@ -478,7 +478,7 @@
       "p1",
       "epic:B05"
     ],
-    "body": "### 交付物\n`users` 表 + `papers.user_id` 外键 + 表结构文档升级。\n\n### 验收\n- [ ] `users` 表：id / username（唯一）/ password_hash / created_at\n- [ ] `papers.user_id` 指向 `users(id)`\n- [ ] 建表语句与 `ALTER` 都写进 `docs/03-数据库表结构.sql`，版本升 1.1.0-frozen\n\n### 依赖 / 文件\n- 依赖：#51（契约 auth 接口）\n- 文件：`docs/03-数据库表结构.sql`\n\n### 不做\n- 不动 chunks / annotation / reading_session 结构\n\n> ⚠️ initdb 目录只在新库首次启动执行：**存量库必须单独跑 ALTER**，否则重演 BUG-019。"
+    "body": "### 交付物\n`users` 表 + `papers.user_id` 外键 + 表结构文档升级。\n\n### 验收\n- [ ] `users` 表：id / username（唯一）/ password_hash / created_at\n- [ ] `papers.user_id` 指向 `users(id)`\n- [ ] 建表语句与 `ALTER` 都写进 `docs/契约/03-数据库表结构.sql`，版本升 1.1.0-frozen\n\n### 依赖 / 文件\n- 依赖：#51（契约 auth 接口）\n- 文件：`docs/契约/03-数据库表结构.sql`\n\n### 不做\n- 不动 chunks / annotation / reading_session 结构\n\n> ⚠️ initdb 目录只在新库首次启动执行：**存量库必须单独跑 ALTER**，否则重演 BUG-019。"
   },
   {
     "no": 83,

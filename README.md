@@ -42,7 +42,7 @@ docker compose logs -f backend
 >
 > 问答需要 DeepSeek Key：在仓库根目录执行 `cp ai-service/.env.example .env`，填好 `DEEPSEEK_API_KEY`，再 `docker compose up -d`（compose 会自动读取根目录 `.env`）。不填也能起，但提问会报「未配置 DEEPSEEK_API_KEY」。
 >
-> 改过 `docs/03-数据库表结构.sql` 后，**不要用 `docker compose down -v` 让它生效** —— `-v` 会连 `hf-cache`（2.2GB 向量模型）和 `uploads`（已上传的 PDF）一起删掉，模型没了就要重新联网下载，演示环境直接废掉。
+> 改过 `docs/契约/03-数据库表结构.sql` 后，**不要用 `docker compose down -v` 让它生效** —— `-v` 会连 `hf-cache`（2.2GB 向量模型）和 `uploads`（已上传的 PDF）一起删掉，模型没了就要重新联网下载，演示环境直接废掉。
 >
 > 正确做法二选一：
 >
@@ -114,15 +114,15 @@ feat|fix|docs|test|chore: 简述 (#IssueID)
 
 | 文档 | 内容 |
 |---|---|
-| `docs/团队分工明细.md` | **七人分工、任务包、责任矩阵、越界红线、接口对接人** |
+| `docs/管理/团队分工明细.md` | **七人分工、任务包、责任矩阵、越界红线、接口对接人** |
 | `CONTRIBUTING.md` | **贡献规范：分支、提交格式、推送纪律、禁止提交项（新人必读）** |
-| `docs/01-api-contract.yaml` | **① 对外接口契约**（浏览器 ↔ Spring Boot，1.3.0-frozen，11 个接口） |
-| `docs/02-内部服务契约.yaml` | **② 内部服务契约**（Spring Boot ↔ FastAPI，4 个接口） |
-| `docs/03-数据库表结构.sql` | **③ 数据库表结构契约**（4 张表完整 DDL） |
-| `docs/三轮功能路线图.md` | Alpha / Beta / RC 任务池与七人分工 |
-| `docs/bbox坐标约定.md` | 引用高亮坐标建系（P2↔P5 对接标准，#7 结论） |
-| `docs/契约评审要点.md` | D3 评审会：20 个拍板点 + 三份评审顺序 |
-| `docs/全员必学清单.md` | D1–D3 全员学习清单与验收方式 |
+| `docs/契约/01-api-contract.yaml` | **① 对外接口契约**（浏览器 ↔ Spring Boot，1.3.0-frozen，11 个接口） |
+| `docs/契约/02-内部服务契约.yaml` | **② 内部服务契约**（Spring Boot ↔ FastAPI，4 个接口） |
+| `docs/契约/03-数据库表结构.sql` | **③ 数据库表结构契约**（4 张表完整 DDL） |
+| `docs/管理/三轮功能路线图.md` | Alpha / Beta / RC 任务池与七人分工 |
+| `docs/契约/bbox坐标约定.md` | 引用高亮坐标建系（P2↔P5 对接标准，#7 结论） |
+| `docs/契约/契约评审要点.md` | D3 评审会：20 个拍板点 + 三份评审顺序 |
+| `docs/alpha/全员必学清单.md` | D1–D3 全员学习清单与验收方式 |
 | `docs/测试/BugList.md` | 缺陷台账（跨轮累计，Beta 起累计至 BUG-022） |
 
 ### Alpha 阶段（`docs/alpha/`）
@@ -149,7 +149,7 @@ feat|fix|docs|test|chore: 简述 (#IssueID)
 
 ## 团队
 
-分工细则见 [`docs/团队分工明细.md`](docs/团队分工明细.md)：每人任务包、Issue 编号、责任矩阵、越界红线、接口对接人。
+分工细则见 [`docs/管理/团队分工明细.md`](docs/管理/团队分工明细.md)：每人任务包、Issue 编号、责任矩阵、越界红线、接口对接人。
 
 | 编号 | 姓名 | GitHub | 角色 | Alpha 主责 |
 |---|---|---|---|---|
@@ -161,7 +161,7 @@ feat|fix|docs|test|chore: 简述 (#IssueID)
 | P6 | 刘征 | lzzzzzasd | 数据·部署 | 建表、Redis、一键启动、日志 |
 | P7 | 李义朋 | xingniansky | 测试·文档 | 冒烟用例、Bug List、Scrum 博客 |
 
-详细验收标准见 `docs/三轮功能路线图.md`。
+详细验收标准见 `docs/管理/三轮功能路线图.md`。
 
 ## 国内网络提示
 

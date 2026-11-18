@@ -4,7 +4,7 @@
 > 验收人：P1 林子航 · 日期：2026-11-06（D11）
 > 验收对象：`#4` 端到端联调与验收走查
 > 测试版本：`3f897b8`（master）
-> 依据：`docs/alpha/Alpha功能清单.md` 第四节「演示脚本 6 步」、`docs/01-api-contract.yaml` 1.0.2、`docs/02-内部服务契约.yaml` 1.0.1
+> 依据：`docs/alpha/Alpha功能清单.md` 第四节「演示脚本 6 步」、`docs/契约/01-api-contract.yaml` 1.0.2、`docs/契约/02-内部服务契约.yaml` 1.0.1
 
 ---
 
@@ -159,8 +159,8 @@ citations：page 6 / 1 / 6，每条含 chunkId，bboxX0~Y1 均为 null（契约�
 | 冒烟用例表（35 条，31 通过） | `docs/alpha/测试/冒烟用例表.md` |
 | Bug List（BUG-001 ~ 010） | `docs/测试/BugList.md` |
 | 命中率判定口径 | `docs/alpha/测试/命中率判定口径.md` |
-| 内部契约 1.0.1（解析 180s / 问答 25s） | `docs/02-内部服务契约.yaml` |
-| 对外契约 1.0.2（新增 apiKey） | `docs/01-api-contract.yaml` |
+| 内部契约 1.0.1（解析 180s / 问答 25s） | `docs/契约/02-内部服务契约.yaml` |
+| 对外契约 1.0.2（新增 apiKey） | `docs/契约/01-api-contract.yaml` |
 
 ---
 

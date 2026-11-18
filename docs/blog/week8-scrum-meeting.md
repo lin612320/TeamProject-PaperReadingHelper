@@ -396,10 +396,10 @@
    → 出口条件七项判定全部写成可测判据；答案质量量化为 9/10 + 未涉及 3/3。证据：`docs/alpha/Alpha出口条件.md`、`docs/alpha/测试/命中率判定口径.md`、`#20`。
 
 2. **契约先行**（1.0.0 → 1.0.1 → 1.0.2 → 1.1.0 → 1.2.0，每次都是踩坑后补）
-   → 1.0.1 补超时口径（180s/25s）、1.0.2 补 `apiKey/baseUrl/model`、1.1.0 补 `/api/search` 与 `bboxMode`、1.2.0 补 `/api/explain`。证据：`docs/01-api-contract.yaml` changelog。
+   → 1.0.1 补超时口径（180s/25s）、1.0.2 补 `apiKey/baseUrl/model`、1.1.0 补 `/api/search` 与 `bboxMode`、1.2.0 补 `/api/explain`。证据：`docs/契约/01-api-contract.yaml` changelog。
 
 3. **分层留白**（Alpha 预埋 bbox 字段与空表，Beta 只填不改表）
-   → `chunks` 预留 `bbox_x0~y1`、`reading_session` 与 `annotation` 空表先建；契约里 `source` 预留四源、错误码按段预留。证据：`docs/03-数据库表结构.sql`。
+   → `chunks` 预留 `bbox_x0~y1`、`reading_session` 与 `annotation` 空表先建；契约里 `source` 预留四源、错误码按段预留。证据：`docs/契约/03-数据库表结构.sql`。
 
 4. **燃尽图与范围变更**（两次基线变动，理想线不能靠措辞修饰）
    → D11 应老师要求延到 D18（基线 28 → 37），D15 与助教讨论后延到 D20；两次都以竖直虚线标注并重设理想线。证据：`docs/燃尽图/燃尽图模板.csv`。

@@ -221,7 +221,7 @@
 - **发现**：2026-11-11 · P7 李义朋 · F6-01 实测（对 paperId=54 提问）
 - **现象**：`POST /api/qa/ask` 返回 `{"code":3001,"message":"AI 服务调用失败","data":null}`；ai-service 日志：
   `psycopg.errors.UndefinedColumn: column "bbox_mode" does not exist`，SQL 中含 `SELECT ... bbox_x0, bbox_y0, bbox_x1, bbox_y1, bbox_mode, ...`。
-- **根因**：`docs/03-数据库表结构.sql` 第 110 行定义了 `bbox_mode TEXT CHECK (bbox_mode IN ('precise','block'))`，但存量库迁移语句在第 133 行是**注释状态**，未执行；实际 `chunks` 表只有 13 列，无 `bbox_mode`。
+- **根因**：`docs/契约/03-数据库表结构.sql` 第 110 行定义了 `bbox_mode TEXT CHECK (bbox_mode IN ('precise','block'))`，但存量库迁移语句在第 133 行是**注释状态**，未执行；实际 `chunks` 表只有 13 列，无 `bbox_mode`。
 - **为什么没早发现**：写入侧 `ai-service/app/db/chunks.py` 有 `_has_bbox_mode_column()` 兜底（列不存在时只写 bbox_*），因此**解析一直正常**；读取侧 `RAG.py:38` 无兜底，一旦提问即整条 SQL 报错。
 - **影响**：**问答主链路完全不可用**（所有论文、所有问题均 3001），且前端只显示“AI 服务调用失败”，难以定位。
 - **修法**：执行迁移 `ALTER TABLE chunks ADD COLUMN IF NOT EXISTS bbox_mode TEXT CHECK (bbox_mode IN ('precise','block'));`；并把 `docs/03` 中的迁移语句从注释改为正式部署步骤，启动自检增加列检查。

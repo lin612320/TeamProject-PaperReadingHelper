@@ -22,11 +22,11 @@ docker compose up -d postgres
 docker compose ps          # 等到 healthy
 ```
 
-表结构由 `docs/03-数据库表结构.sql` 在**数据卷首次创建时**自动导入。
+表结构由 `docs/契约/03-数据库表结构.sql` 在**数据卷首次创建时**自动导入。
 如果之前已经跑过、`pgdata` 卷已存在，需要手动执行一次：
 
 ```bash
-docker exec -i papermind-postgres psql -U papermind -d papermind < docs/03-数据库表结构.sql
+docker exec -i papermind-postgres psql -U papermind -d papermind < docs/契约/03-数据库表结构.sql
 ```
 
 ### 3. 安装依赖（ai-service 目录）
@@ -199,7 +199,7 @@ $env:HF_ENDPOINT="https://hf-mirror.com"          # Windows PowerShell
 
 ## 约定
 
-- 输入输出严格按 `docs/02-内部服务契约.yaml`，`bbox*` 字段 Alpha 一律返回 `null`
+- 输入输出严格按 `docs/契约/02-内部服务契约.yaml`，`bbox*` 字段 Alpha 一律返回 `null`
 - 切片建议 500–800 字、重叠 100 字，chunk 必须带 `page`（1 起）
 - 答案必须基于检索到的段落，无依据时明确说「本文未涉及」，**不许编造**
 - token 用量与费用按 `(prompt_tokens*0.001 + completion_tokens*0.002)/1000` 记录，写日志

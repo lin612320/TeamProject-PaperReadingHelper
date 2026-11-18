@@ -877,9 +877,9 @@ x-conventions:
     alpha_behavior: ❌ 已作废（1.0.x 写「四个 bbox 字段一律返回 null」）—— 1.1.0 起真实填充
     behavior_1_1_0: "单栏论文返回精确块坐标并标 bboxMode=precise；双栏或复杂版面降级为整块范围并标 bboxMode=block；确实无法定位时四个字段为 null 且 bboxMode 为 null，前端退回「只跳页不画框」"
     bbox_mode_field: "接口字段 bboxMode（camelCase）；数据库列建议 bbox_mode（可空，取值 precise/block）；AI 服务内部为 bbox_mode"
-    bbox_mode_db_status: "⚠️ 2026-11-08 核对：docs/03-数据库表结构.sql 只有 bbox_x0/y0/x1/y1，尚无 bbox_mode 列，需 P6 补迁移"
+    bbox_mode_db_status: "⚠️ 2026-11-08 核对：docs/契约/03-数据库表结构.sql 只有 bbox_x0/y0/x1/y1，尚无 bbox_mode 列，需 P6 补迁移"
     bbox_mode_ddl: "ALTER TABLE chunks ADD COLUMN bbox_mode TEXT CHECK (bbox_mode IN ('precise','block'));"
-    # ↓ 1.0.1 新增：来自 P2 #7 预研结论，详见 docs/bbox坐标约定.md
+    # ↓ 1.0.1 新增：来自 P2 #7 预研结论，详见 docs/契约/bbox坐标约定.md
     page_meaning: 使用物理页码（封面、目录计入页数），不使用 PDF 内置页码标签 label
     rotated_page: 旋转页建系不变（原点仍在左上），分母使用旋转后用户看到的当页宽高
     bbox_constraint: 0 ≤ bboxX0 < bboxX1 ≤ 1 且 0 ≤ bboxY0 < bboxY1 ≤ 1，宽高必须为正，不允许相等
