@@ -1,7 +1,7 @@
 # 燃尽图操作手册
 
 > 用途：满足 Alpha 阶段 Scrum Meeting 博客的强制项（需求分析 PPT 第 3 页第 ②条）。
-> 负责人：**P7**（每日记录）· 审核：**P1** · 数据来源：`docs/Alpha_Issue清单.md`
+> 负责人：**P7**（每日记录）· 审核：**P1** · 数据来源：`docs/alpha/Alpha_Issue清单.md`
 
 ---
 

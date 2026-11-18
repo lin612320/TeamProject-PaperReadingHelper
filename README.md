@@ -107,19 +107,45 @@ feat|fix|docs|test|chore: 简述 (#IssueID)
 
 ## 文档索引
 
+> **2026-11-18 起 docs/ 按阶段分目录**：`docs/alpha/` 放 Alpha 阶段文档与测试，`docs/beta/` 放 Beta 阶段文档与测试；
+> 契约三件套、路线图、分工、SOP 等**跨轮共用**的仍留在 `docs/` 根。
+
+### 跨轮共用（根目录）
+
 | 文档 | 内容 |
 |---|---|
 | `docs/团队分工明细.md` | **七人分工、任务包、责任矩阵、越界红线、接口对接人** |
 | `CONTRIBUTING.md` | **贡献规范：分支、提交格式、推送纪律、禁止提交项（新人必读）** |
-| `docs/01-api-contract.yaml` | **① 对外接口契约**（浏览器 ↔ Spring Boot，6 个接口） |
+| `docs/01-api-contract.yaml` | **① 对外接口契约**（浏览器 ↔ Spring Boot，1.3.0-frozen，11 个接口） |
 | `docs/02-内部服务契约.yaml` | **② 内部服务契约**（Spring Boot ↔ FastAPI，4 个接口） |
 | `docs/03-数据库表结构.sql` | **③ 数据库表结构契约**（4 张表完整 DDL） |
-| docs/bbox坐标约定.md | 引用高亮坐标建系（P2↔P5 对接标准，#7 结论） |
-| `docs/契约评审要点.md` | D3 评审会：20 个拍板点 + 三份评审顺序 |
-| `docs/Alpha功能清单.md` | Alpha 四个功能与逐条验收标准 |
 | `docs/三轮功能路线图.md` | Alpha / Beta / RC 任务池与七人分工 |
-| `docs/Alpha_Issue清单.md` | 28 条 Issue，按 D1–D15 排期 |
+| `docs/bbox坐标约定.md` | 引用高亮坐标建系（P2↔P5 对接标准，#7 结论） |
+| `docs/契约评审要点.md` | D3 评审会：20 个拍板点 + 三份评审顺序 |
 | `docs/全员必学清单.md` | D1–D3 全员学习清单与验收方式 |
+| `docs/测试/BugList.md` | 缺陷台账（跨轮累计，Beta 起累计至 BUG-022） |
+
+### Alpha 阶段（`docs/alpha/`）
+
+| 文档 | 内容 |
+|---|---|
+| `docs/alpha/Alpha功能清单.md` | Alpha 四个功能与逐条验收标准 |
+| `docs/alpha/Alpha_Issue清单.md` | 28 条 Issue，按 D1–D15 排期 |
+| `docs/alpha/Alpha出口条件.md` | Alpha 出口条件定稿（含口径三次变化与验收汇总） |
+| `docs/alpha/Alpha延展段-D12-D18计划.md` | 延展段任务与评估 |
+| `docs/alpha/测试/` | 冒烟用例表（主体 + 延展段）、测试报告、命中率口径、F3 抽样 |
+
+### Beta 阶段（`docs/beta/`）
+
+| 文档 | 内容 |
+|---|---|
+| `docs/beta/Beta需求卡.md` | 20 张需求卡（用户故事 + 验收 + 降级预案） |
+| `docs/beta/Beta功能说明.md` | 讲给组员的版本：现在什么样 / 怎么做 / 怎么算做完 |
+| `docs/beta/Beta_Issue清单.md` | 51 条子单，按人排（#51–#101） |
+| `docs/beta/契约1.3.0-评审要点.md` | auth 四接口 / readingOrder / 越权 2001 / 划词拦截 |
+| `docs/beta/契约对账-2026-11-18.md` | 契约 vs 实现逐字段对账（#54） |
+| `docs/beta/测试/自查-2026-11-18-用户视角.md` | 用户视角自查 11 条（分级挂 #50） |
+| `docs/beta/issues.json`、`create-issues.ps1` | 建单数据与脚本（可重跑） |
 
 ## 团队
 

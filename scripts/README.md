@@ -65,7 +65,7 @@ cd PaperMind
 
 说明仓库里还没建 Issue。两种做法：
 
-1. 手动在 GitHub 上照 `docs/Alpha_Issue清单.md` 建 28 条
+1. 手动在 GitHub 上照 `docs/alpha/Alpha_Issue清单.md` 建 28 条
 2. 或者继续用 `-Remaining` 手动记录（燃尽图照样能画，只是不与 Issue 联动）
 
 ### 拍图流程

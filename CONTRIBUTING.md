@@ -2,7 +2,7 @@
 
 > 七仙过海团队 · 论文阅读助手 PaperMind
 > **新人第一件事：读完本文件再动代码。** 全部规则以本文为准，聊天记录里的口头约定不算。
-> 相关文档：`README.md`（项目总览）· `docs/团队分工明细.md`（谁负责什么）· `docs/Alpha_Issue清单.md`（领任务）
+> 相关文档：`README.md`（项目总览）· `docs/团队分工明细.md`（谁负责什么）· `docs/alpha/Alpha_Issue清单.md`（领任务）
 
 ---
 
@@ -63,7 +63,7 @@ git config --local http.sslBackend openssl
 ```
 
 - **一条 commit 只做一件事**：既改前端又改后端的拆成两条
-- Issue 编号必须来自 `docs/Alpha_Issue清单.md`；纯文档类可用 `(#0)`
+- Issue 编号必须来自 `docs/alpha/Alpha_Issue清单.md`；纯文档类可用 `(#0)`
 
 ---
 

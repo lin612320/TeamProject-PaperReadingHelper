@@ -58,7 +58,7 @@
 · 在 Beta需求卡.md 第 6 节填自报人日
 · 想好三个问题的答案（写到群里也行）
 
-先看两份文件：docs/Beta功能说明-讲给组员.md、docs/Beta需求卡.md
+先看两份文件：docs/Beta功能说明-讲给组员.md、docs/beta/Beta需求卡.md
 ```
 
 ---
