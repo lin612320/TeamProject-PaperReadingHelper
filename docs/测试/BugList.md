@@ -233,6 +233,41 @@
 
 ---
 
+### BUG-020 · papers 列表与详情返回字段与契约不一致（S2 · P4 · 待修复）
+
+- **发现**：2026-11-18 · P1 契约逐字段对账（#54）
+- **现象**：
+  - `GET /api/papers` 列表项实测只有 `id/title/filename/pageCount/parseStatus/source/createdAt`，**缺契约声明的 `doi` / `arxivId` / `externalUrl`**；同时**多返回 `parseStatus`**（契约的 `Paper` 未定义该字段）
+  - `GET /api/papers/{id}` 详情**多返回 `fileSize` / `parseError`**，契约的 `PaperDetail` 未定义
+- **影响**：前端只能靠"猜"字段；契约与实现对不上，交接和后续改字段都会踩坑（Alpha 的 BUG-003 同类问题）
+- **修法**：二选一，别两头改
+  1. 契约 1.3.1 补 `parseStatus`（列表项）、`fileSize`、`parseError`，同时明确 `doi/arxivId/externalUrl` 列表项不返回
+  2. 或让实现补齐三个来源字段
+- **建议**：走第 1 条（列表页确实不需要 doi/arxivId，契约应当描述现实）
+
+---
+
+### BUG-021 · 检索超时 10 秒与实际链路冲突，导致检索必然降级（S1 · P4 · 已修代码，契约待升）
+
+- **发现**：2026-11-18 · 用户反馈"只有缓存过的关键词有结果"
+- **现象**：`curl` 实测直连 arXiv 一次 **9.19 秒**；后端 `app.search.timeout-seconds=10` 且拆成 **两次各 5 秒**，两次都超时 → 全部返回 `degraded=true` + 空列表；只有命中 Redis 缓存的关键词才出结果（如 attention）
+- **根因**：超时预算按"境外接口 <5 秒"估的，与校园网实际链路不符
+- **修法**：`docker-compose.yml` 增 `APP_SEARCH_TIMEOUT_SECONDS: 30`（每次尝试 15 秒），实测 science 3.4s / agriculture 0.6s / remote sensing 1.1s 恢复
+- **待办**：契约 1.3.1 补「检索外部源超时 30 秒、单次尝试 15 秒」，并写明依据
+- **修复**：`c7c95af`（11-18）
+
+---
+
+### BUG-022 · citations 缺 readingOrder，契约 1.3.0 新增字段未实现（S2 · P5 · 待修复）
+
+- **发现**：2026-11-18 · P1 契约逐字段对账（#54）
+- **现象**：实测 `citations[]` 只有 8 个字段：`page/snippet/chunkId/bboxX0~Y1/bboxMode`，**没有 `readingOrder`**
+- **根因**：契约 1.3.0 已冻结该字段（`#52`），但实现侧在 `#86`（引用片段与 reading_order 落库）尚未开工，属排期未到
+- **影响**：契约声明了但实现没有 → 若前端此时依赖该字段会拿到 undefined
+- **修法**：随 `#86` 落地；在此之前前端**不得**依赖 `readingOrder`（契约已写明可空）
+
+---
+
 ## 编号说明
 
 - BUG-008 / BUG-009 沿用 P1 端到端走查（`docs/验收走查/走查表-2026-11-04.md`）的编号。
@@ -242,3 +277,4 @@
 - BUG-017 为 `/api/search` 降级缺 `degraded` 标记（2026-11-10 发现，`8dd04db` 修复，11-11 复测通过）。
 - BUG-018 为检索缓存提示时间用 UTC（2026-11-11 发现，待修复）。
 - BUG-019 为 `chunks.bbox_mode` 列未创建导致问答全 3001（2026-11-11 发现，S0，待修复）。
+- BUG-020/021/022 为 Beta 首轮（2026-11-18）P1 对账与用户反馈产生：字段与契约不一致、检索超时预算错误、readingOrder 未实现。
