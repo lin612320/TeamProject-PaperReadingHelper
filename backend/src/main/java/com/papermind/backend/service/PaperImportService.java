@@ -52,7 +52,7 @@ public class PaperImportService {
             throw new BizException(ErrorCode.INVALID_PARAM, "缺少 arxivId / doi / pdfUrl，无法定位全文");
         }
 
-        if (!arxivId.isEmpty()) {
+        if (!arxivId.isEmpty()) {   //幂等查重
             Long existing = findExistingByArxivId(arxivId);
             if (existing != null) {
                 log.info("import skipped, already exists arxivId={} paperId={}", arxivId, existing);

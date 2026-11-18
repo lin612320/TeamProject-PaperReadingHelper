@@ -51,7 +51,7 @@ public class ArxivClient {
             + "?search_query=" + URLEncoder.encode(query, StandardCharsets.UTF_8)
             + "&start=" + start
             + "&max_results=" + maxResults
-            + "&sortBy=relevance&sortOrder=descending";
+            + "&sortBy=relevance&sortOrder=descending"; //相关度倒序
 
         log.info("arxiv search keyword={} start={} max={}", keyword, start, maxResults);
 
@@ -157,7 +157,7 @@ public class ArxivClient {
             Element link = (Element) links.item(i);
             String rel = link.getAttribute("rel");
             String title = link.getAttribute("title");
-            String href = link.getAttribute("href");
+            String href = link.getAttribute("href");  //真实地址
             if (href == null || href.isEmpty()) {
                 continue;
             }

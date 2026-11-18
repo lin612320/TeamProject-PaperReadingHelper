@@ -148,7 +148,7 @@ public class OpenAlexClient {
     }
 
     @SuppressWarnings("unchecked")
-    private String rebuildAbstract(Map<String, Object> inverted) {
+    private String rebuildAbstract(Map<String, Object> inverted) {   //倒排重建摘要
         if (inverted == null || inverted.isEmpty()) return null;
         TreeMap<Integer, String> ordered = new TreeMap<>();
         for (Map.Entry<String, Object> e : inverted.entrySet()) {
