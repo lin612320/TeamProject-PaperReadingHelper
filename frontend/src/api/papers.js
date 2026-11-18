@@ -126,9 +126,17 @@ export function uploadPaper(file, onProgress) {
 }
 
 // 针对单篇论文提问（25 秒超时，超过则中止并抛错）
-export async function askQuestion(paperId, question) {
+// aiConfig 可选，包含用户在设置页配置的 apiKey/baseUrl/model
+export async function askQuestion(paperId, question, aiConfig = null) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 25000)
+
+  const payload = { paperId, question }
+  if (aiConfig) {
+    payload.apiKey = aiConfig.apiKey
+    payload.baseUrl = aiConfig.baseUrl
+    payload.model = aiConfig.model
+  }
 
   let response
   let result
@@ -136,7 +144,7 @@ export async function askQuestion(paperId, question) {
     response = await fetch(`${API_BASE}/api/qa/ask`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paperId, question }),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     })
 
@@ -144,6 +152,93 @@ export async function askQuestion(paperId, question) {
   } catch (error) {
     if (error?.name === 'AbortError') {
       throw new Error('AI 服务响应超时（>25s），请稍后重试')
+    }
+    throw formatApiError(error)
+  } finally {
+    clearTimeout(timeoutId)
+  }
+
+  if (!response.ok || !result || result.code !== 0) {
+    throw formatApiError(null, response, result)
+  }
+
+  return result.data
+}
+
+// 关键词检索外部学术库
+// source 默认 arxiv；返回 { items, total, degraded, cached }
+export async function searchPapers(keyword, source = 'arxiv', page = 1, size = 10) {
+  const params = new URLSearchParams({
+    keyword,
+    source,
+    page: String(page),
+    size: String(size),
+  })
+
+  const data = await request(`/api/search?${params.toString()}`)
+
+  return {
+    items: data?.items ?? [],
+    total: data?.total ?? 0,
+    degraded: data?.degraded === true,
+    cached: data?.cached === true,
+  }
+}
+
+// 把检索到的一条论文导入本库
+// 入参是 /api/search 返回的 PaperMeta 原样回传
+// 返回 { paperId }
+export async function importPaper(paperMeta) {
+  let response
+  let result
+  try {
+    response = await fetch(`${API_BASE}/api/papers/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(paperMeta),
+    })
+    result = await response.json().catch(() => null)
+  } catch (error) {
+    throw formatApiError(error)
+  }
+
+  if (!response.ok || !result || result.code !== 0) {
+    throw formatApiError(null, response, result)
+  }
+
+  return result.data
+}
+
+// 划词翻译 / 术语解释
+// mode: translate | term
+// 返回 { translation, explanation, mode, truncated }
+// aiConfig 可选，包含用户在设置页配置的 apiKey/baseUrl/model
+export async function explainText(text, mode = 'translate', { paperId = null, context = null, aiConfig = null } = {}) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 15000)
+
+  const payload = { text, mode }
+  if (paperId) payload.paperId = paperId
+  if (context) payload.context = context
+  if (aiConfig) {
+    payload.apiKey = aiConfig.apiKey
+    payload.baseUrl = aiConfig.baseUrl
+    payload.model = aiConfig.model
+  }
+
+  let response
+  let result
+  try {
+    response = await fetch(`${API_BASE}/api/explain`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    })
+    result = await response.json().catch(() => null)
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error('解释服务响应超时（>15s），请稍后重试')
     }
     throw formatApiError(error)
   } finally {

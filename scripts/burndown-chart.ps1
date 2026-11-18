@@ -29,14 +29,18 @@ for ($i = 0; $i -lt $rows.Count; $i++) {
     $r = $rows[$i]
     $dayNum = 0
     if ($r.'工作日' -match '(\d+)') { $dayNum = [int]$matches[1] }
-    $ideal = 0
+    $ideal = $null
     if (-not [string]::IsNullOrWhiteSpace($r.'理想剩余Issue')) { $ideal = [double]$r.'理想剩余Issue' }
+    $oldIdeal = $null
+    if ($r.PSObject.Properties.Name -contains '旧基线理想' -and -not [string]::IsNullOrWhiteSpace($r.'旧基线理想')) { $oldIdeal = [double]$r.'旧基线理想' }
     $actual = $null
     if (-not [string]::IsNullOrWhiteSpace($r.'实际剩余Issue')) { $actual = [double]$r.'实际剩余Issue' }
-    $points += [pscustomobject]@{ Day = $dayNum; Label = $r.'工作日'; Ideal = $ideal; Actual = $actual }
+    $added = 0
+    if (-not [string]::IsNullOrWhiteSpace($r.'当日新增数')) { $added = [int]$r.'当日新增数' }
+    $points += [pscustomobject]@{ Day = $dayNum; Label = $r.'工作日'; Ideal = $ideal; OldIdeal = $oldIdeal; Actual = $actual; Added = $added }
 }
 
-$maxY = ($points | ForEach-Object { $_.Ideal } | Measure-Object -Maximum).Maximum
+$maxY = ($points | ForEach-Object { $_.Ideal; $_.OldIdeal } | Where-Object { $null -ne $_ } | Measure-Object -Maximum).Maximum
 $actualMax = ($points | Where-Object { $null -ne $_.Actual } | ForEach-Object { $_.Actual } | Measure-Object -Maximum).Maximum
 if ($actualMax -gt $maxY) { $maxY = $actualMax }
 $maxY = [math]::Ceiling($maxY / 4) * 4 + 4
@@ -96,14 +100,42 @@ $axisPen = New-Object System.Drawing.Pen $cBorder, 1.5
 $g.DrawLine($axisPen, $mL, $mT, $mL, $mT + $plotH)
 $g.DrawLine($axisPen, $mL, $mT + $plotH, $mL + $plotW, $mT + $plotH)
 
-# 理想线（灰虚线）
+# 旧基线理想线（浅灰点线）—— scope 变更前的原计划，只作历史对照
+$cOldIdeal = ([System.Drawing.Color]::FromArgb(203,203,213))
+$oldIdealPen = New-Object System.Drawing.Pen $cOldIdeal, 1.5
+$oldIdealPen.DashStyle = [System.Drawing.Drawing2D.DashStyle]::Dot
+$prevO = $null
+foreach ($p in $points) {
+    if ($null -eq $p.OldIdeal) { $prevO = $null; continue }
+    if ($null -ne $prevO -and ($p.Day - $prevO.Day) -eq 1) {
+        $g.DrawLine($oldIdealPen, (X $prevO.Day), (Y $prevO.OldIdeal), (X $p.Day), (Y $p.OldIdeal))
+    }
+    $prevO = $p
+}
+
+# 新基线理想线（灰虚线）—— scope 变更后重新排的计划，从变更点起算到 D18=0
 $idealPen = New-Object System.Drawing.Pen $cIdeal, 2
 $idealPen.DashStyle = [System.Drawing.Drawing2D.DashStyle]::Dash
 $prev = $null
 foreach ($p in $points) {
-    if ($null -eq $prev) { $prev = $p; continue }
-    $g.DrawLine($idealPen, (X $prev.Day), (Y $prev.Ideal), (X $p.Day), (Y $p.Ideal))
+    if ($null -eq $p.Ideal) { $prev = $null; continue }
+    if ($null -ne $prev -and ($p.Day - $prev.Day) -eq 1) {
+        $g.DrawLine($idealPen, (X $prev.Day), (Y $prev.Ideal), (X $p.Day), (Y $p.Ideal))
+    }
     $prev = $p
+}
+
+# scope 变更竖线（标在新基线起点）
+$firstNew = $points | Where-Object { $null -ne $_.Ideal } | Select-Object -First 1
+if ($null -ne $firstNew) {
+    $vx = X $firstNew.Day
+    $cMark = ([System.Drawing.Color]::FromArgb(185,140,30))
+    $vPen = New-Object System.Drawing.Pen $cMark, 1.5
+    $vPen.DashStyle = [System.Drawing.Drawing2D.DashStyle]::Dash
+    $g.DrawLine($vPen, $vx, $mT, $vx, $mT + $plotH)
+    $lbl = 'scope 变更 +11'
+    $szl = $g.MeasureString($lbl, $smallFont)
+    $g.DrawString($lbl, $smallFont, (New-Object System.Drawing.SolidBrush $cMark), [math]::Max($mL + 2, $vx - $szl.Width - 6), $mT + 4)
 }
 
 # 实际线（蓝实线）—— 只在有数据的相邻点之间连线
@@ -122,24 +154,34 @@ foreach ($p in $points) {
 # 图例
 $lx = $mL + 10; $ly = $mT - 28
 $g.DrawLine($idealPen, $lx, $ly + 6, $lx + 30, $ly + 6)
-$g.DrawString('理想剩余', $font, (New-Object System.Drawing.SolidBrush $cIdeal), $lx + 36, $ly - 2)
-$g.DrawLine($actualPen, $lx + 200, $ly + 6, $lx + 230, $ly + 6)
-$g.DrawString('实际剩余', $font, (New-Object System.Drawing.SolidBrush $cActual), $lx + 236, $ly - 2)
+$g.DrawString('理想（新基线）', $font, (New-Object System.Drawing.SolidBrush $cIdeal), $lx + 36, $ly - 2)
+$g.DrawLine($oldIdealPen, $lx + 190, $ly + 6, $lx + 220, $ly + 6)
+$g.DrawString('旧基线（scope 变更前）', $smallFont, (New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(175,175,188))), $lx + 226, $ly)
+$g.DrawLine($actualPen, $lx + 400, $ly + 6, $lx + 430, $ly + 6)
+$g.DrawString('实际剩余', $font, (New-Object System.Drawing.SolidBrush $cActual), $lx + 436, $ly - 2)
 
 # 右下角状态
 $filled = @($points | Where-Object { $null -ne $_.Actual })
 if ($filled.Count -gt 0) {
     $last = $filled[-1]
-    $dev = $last.Actual - $last.Ideal
+    $lastIdeal = 0
+    if ($null -ne $last.Ideal) { $lastIdeal = $last.Ideal }
+    $dev = $last.Actual - $lastIdeal
     $state = '正常'
     $stateColor = ([System.Drawing.Color]::FromArgb(30,140,60))
-    if ($dev -ge 5) { $state = '严重落后，建议砍范围'; $stateColor = ([System.Drawing.Color]::FromArgb(200,40,40)) }
+    if ($last.Added -gt 0) {
+        # 范围变更：当日新增了 Issue（如被要求扩范围），此处的正向偏差不是落后，不能按落后打分
+        $state = "当日 scope 变更（新增 $($last.Added) 条），已按新基线重设理想线"
+        $stateColor = ([System.Drawing.Color]::FromArgb(90,90,160))
+    }
+    elseif ($dev -ge 5) { $state = '严重落后，建议砍范围'; $stateColor = ([System.Drawing.Color]::FromArgb(200,40,40)) }
     elseif ($dev -ge 3) { $state = '落后，需处理阻塞'; $stateColor = ([System.Drawing.Color]::FromArgb(210,130,20)) }
     elseif ($dev -le -1) { $state = '领先理想线'; $stateColor = ([System.Drawing.Color]::FromArgb(30,140,60)) }
-    $info = "{0}：实际 {1}，理想 {2}，偏差 {3:+#;-#;0}  —— {4}" -f $last.Label, $last.Actual, $last.Ideal, $dev, $state
-    $g.DrawString($info, $font, (New-Object System.Drawing.SolidBrush $stateColor), $mL, $mT + $plotH + 34)
+    $info = "{0}：实际 {1}，新基线理想 {2}，偏差 {3:+#;-#;0}  —— {4}" -f $last.Label, $last.Actual, $lastIdeal, $dev, $state
+    $g.DrawString($info, $font, (New-Object System.Drawing.SolidBrush $stateColor), $mL, $mT + $plotH + 24)
 }
-$g.DrawString(("生成时间 " + (Get-Date -Format 'yyyy-MM-dd HH:mm')), $smallFont, (New-Object System.Drawing.SolidBrush $cIdeal), $mL, $H - 26)
+$g.DrawString('说明：纵轴仅统计未关闭 Issue；BugList 中的缺陷（BUG-012 / BUG-013 / BUG-016 等）另行跟踪，未计入本图', $smallFont, (New-Object System.Drawing.SolidBrush $cIdeal), $mL, $H - 38)
+$g.DrawString(("生成时间 " + (Get-Date -Format 'yyyy-MM-dd HH:mm')), $smallFont, (New-Object System.Drawing.SolidBrush $cIdeal), $mL, $H - 18)
 
 $bmp.Save($Out, [System.Drawing.Imaging.ImageFormat]::Png)
 $g.Dispose(); $bmp.Dispose()

@@ -117,11 +117,36 @@ def main():
                 missing = [key for key in required if key not in body]
                 failures += not check("响应字段完整", missing, [])
                 failures += not check("citations 是数组", isinstance(body.get("citations"), list), True)
+                citations = body.get("citations", [])
                 failures += not check(
                     "引用页码从 1 开始",
-                    all(item.get("page", 0) >= 1 for item in body.get("citations", [])),
+                    all(item.get("page", 0) >= 1 for item in citations),
                     True,
                 )
+
+                bbox_ok = True
+                mode_ok = True
+                for item in citations:
+                    bbox = [
+                        item.get("bboxX0"),
+                        item.get("bboxY0"),
+                        item.get("bboxX1"),
+                        item.get("bboxY1"),
+                    ]
+                    if any(value is None for value in bbox):
+                        bbox_ok = False
+                        continue
+                    if not all(isinstance(value, (int, float)) for value in bbox):
+                        bbox_ok = False
+                        continue
+                    x0, y0, x1, y1 = bbox
+                    if not (0 <= x0 < x1 <= 1 and 0 <= y0 < y1 <= 1):
+                        bbox_ok = False
+                    if item.get("bboxMode") not in ("precise", "block"):
+                        mode_ok = False
+
+                failures += not check("citation bbox 有效（0~1、宽高为正）", bbox_ok, True)
+                failures += not check("citation bboxMode 有效", mode_ok, True)
                 print("答案:", str(body.get("answer", ""))[:80])
             print()
 

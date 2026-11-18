@@ -1,0 +1,7 @@
+﻿59e8e2f | Cheongfan | 20:28 | test: #40 验收；chunk 级框非逐句精确 (#40)
+9ed0943 | Cheongfan | 20:11 | Merge branch 'master' of https://github.com/lin612320/TeamProject-PaperReadingHelper
+6b4ef19 | Cheongfan | 20:11 | feat: 问答引用返回 bbox/bboxMode，补库/接口对账断言（#40）
+f53cfd0 | 林子航 | 20:03 | docs: 燃尽口径变更②——#44/#45/#46 不计入迭代计数（GitHub 保持 open），剩余 9 条 (#3 #44 #45 #46)
+0d9ae0d | 林子航 | 19:59 | docs: D15 燃尽数据（剩余 12 / 理想 6）(#3)
+f232600 | hexag0n | 19:21 | feat: 新增文献检索与导入页面 (#39)
+cfad300 | Li Yipeng | 17:54 | test: BugList 新增 BUG-017（检索降级缺 degraded）；编号说明移至文末；延展段用例表回填 12 条 (#24 #25)

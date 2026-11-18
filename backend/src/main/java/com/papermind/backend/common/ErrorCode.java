@@ -12,6 +12,7 @@ public enum ErrorCode {
     EMPTY_QUESTION(2003, 422, "问题不能为空"),
     AI_SERVICE_ERROR(3001, 502, "AI 服务调用失败"),
     AI_SERVICE_TIMEOUT(3002, 504, "AI 服务超时"),
+    AI_SERVICE_AUTH_ERROR(3003, 400, "API Key 无效，请到设置页检查"),
     STORAGE_ERROR(4001, 500, "文件存储失败"),
     INTERNAL_ERROR(5000, 500, "服务器内部错误");
 

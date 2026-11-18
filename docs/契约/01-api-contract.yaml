@@ -1,0 +1,931 @@
+openapi: 3.0.3
+info:
+  title: PaperMind API
+  version: 1.3.0-frozen
+  description: |
+    PaperMind 论文阅读助手接口契约（**1.3.0 于 2026-11-17 由 P1 拍板冻结**；沿用 1.0.0 的做法——先冻结、在 11-19 例会向全员通报，**不等回执**。1.0.0 于 2026-10-24、1.1.0 于 2026-11-08、1.2.0 于 2026-11-10 冻结，变更须经 P1 并升版本号）。
+
+    **1.3.0 包含**：auth 四接口（注册 / 登录 / 当前用户 / 登出）、`chunks.reading_order` 阅读顺序、`citations[].readingOrder`、划词低质输入拦截规则、越权口径（2001），以及新增错误码段 **6001–6003**。
+
+    约定：
+    - 所有响应统一包装为 ApiResponse，成功 code=0
+    - 时间统一 ISO 8601（Asia/Shanghai）——**必须是本地时间，不得返回无时区语义的裸字符串**
+    - 错误必须返回结构化 code + message，禁止裸抛堆栈
+    - 分页参数统一 page（从 1 开始）/ size（默认 20，最大 100）
+    - **页码 page 一律从 1 开始（1-based）**，0 或负数视为非法
+    - **引用坐标 bbox 归一化为 0~1 的相对值**（相对当页宽高，左上为原点）；**1.1.0 起实际填充**（原计划 Beta，延展段 #40 提前实现），无法精确定位时降级为整块框并标 `bboxMode`
+    - 检索接口 `/api/search` **1.1.0 起实装**（原计划 Beta，延展段 #38 提前实现），仅取开放获取全文链接
+    - 详见文末 `x-conventions` 一节的错误码表与上传限制
+
+servers:
+  - url: http://localhost:8080
+    description: 本地后端（Spring Boot）
+
+tags:
+  - name: auth
+    description: 注册 / 登录 / 令牌（1.3.0 新增）
+  - name: paper
+    description: 文献上传与管理
+  - name: qa
+    description: 单篇精读问答
+  - name: search
+    description: 关键词检索外部学术库（1.1.0 起实装）
+
+paths:
+  # ============================================================
+  # 1.3.0 新增：auth 四接口（#51）
+  # 约定：除注册/登录外，所有受保护接口都要带 Authorization: Bearer <token>
+  # ============================================================
+  /api/auth/register:
+    post:
+      tags: [auth]
+      summary: 注册（1.3.0 新增）
+      description: |
+        用户名唯一，密码以 **bcrypt** 入库（不落明文、不写日志、不回显）。
+        成功返回与登录同构的令牌，前端可直接进入已登录态。
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthRegisterRequest"
+      responses:
+        "200":
+          description: 注册成功并签发令牌
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseAuthToken"
+        "400":
+          description: 参数不合法，或用户名已被占用（6003）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+  /api/auth/login:
+    post:
+      tags: [auth]
+      summary: 登录（1.3.0 新增）
+      description: |
+        校验用户名与密码，成功签发 JWT。
+
+        **账号不存在与密码错误返回同一个错误码 6001**，不得让攻击者据此探测「该用户名是否存在」。
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthLoginRequest"
+      responses:
+        "200":
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseAuthToken"
+        "401":
+          description: 用户名或密码不正确（6001）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+  /api/auth/me:
+    get:
+      tags: [auth]
+      summary: 取当前登录用户（1.3.0 新增）
+      description: 前端启动时用它判断登录态是否还有效，避免刷新后先闪一下登录页。
+      operationId: currentUser
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 当前用户信息
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseUserInfo"
+        "401":
+          description: 未携带令牌、令牌过期或被篡改（6002）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+  /api/auth/logout:
+    post:
+      tags: [auth]
+      summary: 登出（1.3.0 新增）
+      description: |
+        无状态 JWT 下服务端不需要销毁令牌，本接口只做两件事：记一条登出日志、返回成功，由前端清除本地令牌。
+        若日后改 Redis 黑名单，语义不变，仅是服务端多一步。
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 登出成功（前端负责清除本地令牌）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+  /api/papers:
+    post:
+      tags: [paper]
+      summary: 上传 PDF 文献
+      description: Alpha：单用户，不做鉴权（P4/#13）
+      operationId: uploadPaper
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 仅接受 application/pdf
+      responses:
+        "200":
+          description: 上传成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponsePaperDetail"
+        "400":
+          description: 非 PDF 或文件为空
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+    get:
+      tags: [paper]
+      summary: 文献列表
+      operationId: listPapers
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1, minimum: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          description: 列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponsePaperList"
+
+  /api/papers/{paperId}:
+    get:
+      tags: [paper]
+      summary: 文献详情
+      operationId: getPaper
+      parameters:
+        - $ref: "#/components/parameters/PaperId"
+      responses:
+        "200":
+          description: 详情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponsePaperDetail"
+        "404":
+          description: 文献不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+    delete:
+      tags: [paper]
+      summary: 删除文献
+      operationId: deletePaper
+      parameters:
+        - $ref: "#/components/parameters/PaperId"
+      responses:
+        "200":
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+  /api/papers/{paperId}/file:
+    get:
+      tags: [paper]
+      summary: 获取 PDF 原文件（供 PDF.js 渲染）
+      operationId: getPaperFile
+      parameters:
+        - $ref: "#/components/parameters/PaperId"
+      responses:
+        "200":
+          description: PDF 二进制流
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+
+  /api/qa/ask:
+    post:
+      tags: [qa]
+      summary: 针对单篇论文提问
+      description: Alpha 返回答案 + 引用片段 + 页码；bbox 字段预留，Beta 填充（P5/#19）
+      operationId: askQuestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AskRequest"
+      responses:
+        "200":
+          description: 问答结果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseAskResult"
+        "404":
+          description: 文献不存在或尚未完成解析
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+  /api/explain:
+    post:
+      tags: [qa]
+      summary: 划词翻译 / 术语解释（1.2.0 新增）
+      description: |
+        #42。只处理用户选中的那段文本，不传整篇论文。
+
+        - `paperId` 可空：未入库论文也支持，只是不查库内上下文
+        - `context` 可选：前端可从当前页截取少量上下文（服务端最多取 600 字）
+        - 选中文本超过 1000 字时服务端截断，响应 `truncated=true`
+        - 错误映射：INVALID_MODE / EMPTY_TEXT → 1001；LLM_TIMEOUT → 3002；LLM_AUTH_ERROR → 3003
+      operationId: explainText
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExplainRequest"
+      responses:
+        "200":
+          description: 翻译/解释结果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseExplainResult"
+        "400":
+          description: 参数错误或 API Key 无效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+        "504":
+          description: 大模型超时
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+  /api/search:
+    get:
+      tags: [search]
+      summary: 关键词检索外部学术库（1.1.0 起实装）
+      description: |
+        延展段提前实现 F5-a（原计划 Beta）。**主源 arXiv，OpenAlex 作为第二源兜底**；RC 再做多源聚合去重与排序。
+
+        合规红线：只取**开放获取（OA）**全文链接；非 OA 只返回 `landingUrl`，禁止绕过付费墙。
+
+        降级约定（必须有，校园网到境外接口不稳定）：
+        - 单次外部请求超时 **10 秒**即返回已拿到的结果，`data.degraded=true`，不得 500
+        - 无任何结果又外部不可达时，返回空列表 + `data.degraded=true`
+        - 命中 Redis 缓存（24 小时）时 `data.cached=true`
+
+        导入：拿到结果后由前端调 `POST /api/papers/import`（见下）落库并返回 paperId，之后直接进问答主链。
+      operationId: searchPapers
+      deprecated: false
+      x-status: implemented-1.1.0
+      parameters:
+        - name: keyword
+          in: query
+          required: true
+          schema: { type: string, minLength: 1 }
+        - name: source
+          in: query
+          schema:
+            type: string
+            enum: [arxiv, openalex, semanticscholar, crossref]
+            default: arxiv
+        - name: page
+          in: query
+          schema: { type: integer, default: 1, minimum: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 10, minimum: 1, maximum: 50 }
+      responses:
+        "200":
+          description: 检索结果；降级时 degraded=true，命中缓存时 cached=true
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponsePaperMetaList"
+
+  /api/papers/import:
+    post:
+      tags: [search]
+      summary: 把检索到的一条论文导入本库（1.1.0 新增）
+      description: |
+        入参是 `/api/search` 返回的 `PaperMeta` 原样回传（或只传 `arxivId` / `doi` / `pdfUrl` 之一 + `title`）。
+        行为：下载 OA 全文 PDF 到本地上传目录 → 建 `papers` 记录 → 返回 `paperId`，前端随后可直接 `/reader/{paperId}` 提问。
+        非 OA 或下载失败 → `3001`（AI/上游取文失败），message 说明「该论文非开放获取，仅提供原文链接」。
+      operationId: importPaper
+      x-status: implemented-1.1.0
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaperMeta"
+      responses:
+        "200":
+          description: 导入成功，返回新 paperId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+        "400":
+          description: 参数缺失或不是 OA 全文
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        （1.3.0 新增）请求头 `Authorization: Bearer <token>`。
+        令牌由 `/api/auth/login` 或 `/api/auth/register` 签发；缺失、过期、签名被篡改一律按 6002 / HTTP 401 处理。
+
+  parameters:
+    PaperId:
+      name: paperId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+
+  schemas:
+    ApiResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: integer
+          description: 0 表示成功，非 0 为业务错误码
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          nullable: true
+
+    ApiResponsePaperDetail:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/PaperDetail"
+
+    ApiResponsePaperList:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                total: { type: integer, example: 12 }
+                items:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/Paper"
+
+    ApiResponseAskResult:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/AskResult"
+
+    ApiResponseExplainResult:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/ExplainResult"
+
+    ApiResponsePaperMetaList:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                total: { type: integer }
+                items:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/PaperMeta"
+                degraded:
+                  type: boolean
+                  description: 外部数据源不可达或超时，返回的是部分结果或缓存（1.1.0 新增）
+                cached:
+                  type: boolean
+                  description: 命中 24 小时 Redis 缓存，未真的访问外部库（1.1.0 新增）
+
+    Paper:
+      type: object
+      required: [id, title, pageCount, createdAt]
+      properties:
+        id: { type: integer, format: int64, example: 1 }
+        title:
+          type: string
+          example: Attention Is All You Need
+        filename:
+          type: string
+          example: attention.pdf
+        pageCount:
+          type: integer
+          example: 15
+        source:
+          type: string
+          description: 来源，本地上传为 upload；检索导入为 arxiv/openalex（Beta 启用）
+          enum: [upload, arxiv, openalex, semanticscholar, crossref]
+          default: upload
+        doi: { type: string, nullable: true }
+        arxivId: { type: string, nullable: true }
+        externalUrl:
+          type: string
+          nullable: true
+          description: 原文落地页（非 OA 时唯一可给的东西）
+        createdAt:
+          type: string
+          format: date-time
+
+    PaperDetail:
+      allOf:
+        - $ref: "#/components/schemas/Paper"
+        - type: object
+          properties:
+            parseStatus:
+              type: string
+              enum: [pending, parsing, ready, failed]
+              description: 解析状态，pending/parsing 时不允许提问
+            chunkCount: { type: integer, example: 128 }
+
+    Citation:
+      type: object
+      required: [page, snippet]
+      properties:
+        page:
+          type: integer
+          description: 引用所在页（1 起）
+          example: 3
+        snippet:
+          type: string
+          description: 引用原文片段
+        chunkId:
+          type: integer
+          format: int64
+          nullable: true
+        readingOrder:
+          type: integer
+          nullable: true
+          description: |
+            （1.3.0 新增）该引用所在 chunk 的页内阅读顺序，从 0 起，由 AI 服务按
+            `(band, column, y0, x0)` 排出（双栏页先读完左栏再读右栏）。
+
+            - **老数据可能为 null**，前端不得依赖此字段做定位，只作为排序与调试线索
+            - 定位仍以 `bboxX0/Y0/X1/Y1` + `page` 为准
+          example: 7
+        bboxX0:
+          type: number
+          nullable: true
+          description: 归一化左上 x（相对页宽 0~1）。1.1.0 起实际填充；无法精确定位时为整块框，见 bboxMode
+        bboxY0:
+          type: number
+          nullable: true
+        bboxX1:
+          type: number
+          nullable: true
+        bboxY1:
+          type: number
+          nullable: true
+        bboxMode:
+          type: string
+          nullable: true
+          enum: [precise, block]
+          description: |
+            bbox 的精度来源（1.1.0 新增）：
+            - `precise` = 单栏正文，框对应原句所在块，前端可直接画细框
+            - `block`   = 双栏或版面复杂，框是整块/整段范围，**前端不得当作逐句精确定位**
+            - `null`    = 无坐标，前端退回「只跳页不画框」
+          example: precise
+
+    AskRequest:
+      type: object
+      required: [paperId, question]
+      properties:
+        paperId: { type: integer, format: int64, example: 1 }
+        question:
+          type: string
+          minLength: 1
+          maxLength: 500
+          example: 这篇文章提出的方法核心是什么？
+        apiKey:
+          type: string
+          nullable: true
+          description: |
+            （1.0.2 新增）用户在「设置」页填写的 DeepSeek API Key，按次传入。
+            - 为空或缺失时，AI 服务回退使用服务端 .env 里的 DEEPSEEK_API_KEY
+            - 服务端不得落库、不得写入日志、不得回显
+            - 前端存放位置由实现决定（当前为浏览器 localStorage），设置页需提示「仅保存在本机浏览器」
+          example: sk-xxxxxxxx
+        baseUrl:
+          type: string
+          nullable: true
+          description: （1.0.2 新增）可选，覆盖服务端默认的 DEEPSEEK_BASE_URL
+        model:
+          type: string
+          nullable: true
+          description: （1.0.2 新增）可选，覆盖服务端默认的 LLM_MODEL
+
+    AskResult:
+      type: object
+      required: [answer, citations]
+      properties:
+        answer:
+          type: string
+          description: 基于检索段落生成的答案，不得脱离原文编造
+        citations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Citation"
+        elapsedMs:
+          type: integer
+          description: 服务端耗时，用于守护 < 20s 的验收标准
+        model:
+          type: string
+          example: deepseek-chat
+
+    ExplainRequest:
+      type: object
+      required: [text]
+      properties:
+        paperId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 可选；未入库论文不传，仍可翻译/解释
+        text:
+          type: string
+          minLength: 1
+          description: 选中文本；超过 1000 字服务端截断，响应 truncated=true
+        mode:
+          type: string
+          enum: [translate, term]
+          default: translate
+          description: translate=翻译；term=术语解释（解释第一句必须是白话定义）
+        context:
+          type: string
+          nullable: true
+          description: 可选；前端从当前页截取的上下文，服务端最多取 600 字
+        apiKey:
+          type: string
+          nullable: true
+          description: 可选；与 AskRequest.apiKey 相同，为空时用服务端 .env
+        baseUrl:
+          type: string
+          nullable: true
+        model:
+          type: string
+          nullable: true
+
+    ExplainResult:
+      type: object
+      required: [translation, explanation, mode, truncated]
+      properties:
+        translation:
+          type: string
+          description: 中文译文或中文术语；translate 模式必填
+        explanation:
+          type: string
+          description: 解释；term 模式第一句必须是白话定义
+        mode:
+          type: string
+          enum: [translate, term]
+        truncated:
+          type: boolean
+          description: 选中文本是否因超过 1000 字被截断
+
+    PaperMeta:
+      type: object
+      description: 外部检索结果元数据（Beta）
+      required: [title, source]
+      properties:
+        title: { type: string }
+        authors:
+          type: array
+          items: { type: string }
+        year: { type: integer, nullable: true }
+        source:
+          type: string
+          enum: [arxiv, openalex, semanticscholar, crossref]
+        doi: { type: string, nullable: true }
+        arxivId: { type: string, nullable: true }
+        abstract: { type: string, nullable: true }
+        pdfUrl:
+          type: string
+          nullable: true
+          description: 仅开放获取（OA）全文链接；无权限时必须是 null
+        landingUrl:
+          type: string
+          nullable: true
+
+    # ---------------- 1.3.0 新增：auth 相关模型（#51） ----------------
+    AuthRegisterRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 32
+          pattern: "^[A-Za-z0-9_\\-]+$"
+          description: 仅字母、数字、下划线、连字符；唯一
+          example: linzihang
+        password:
+          type: string
+          minLength: 8
+          maxLength: 64
+          description: 明文只在传输中出现一次；服务端 bcrypt 后入库，**不得写入日志、不得回显**
+          example: "********"
+
+    AuthLoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, example: linzihang }
+        password: { type: string, example: "********" }
+
+    AuthToken:
+      type: object
+      required: [token, tokenType, expiresAt, user]
+      properties:
+        token:
+          type: string
+          description: JWT，前端保存并在后续请求的 Authorization 头中携带
+        tokenType:
+          type: string
+          enum: [Bearer]
+          default: Bearer
+        expiresAt:
+          type: string
+          format: date-time
+          description: 过期时间（Asia/Shanghai，带时区语义）；由服务端给出，前端不得自行推算
+        user:
+          $ref: "#/components/schemas/UserInfo"
+
+    UserInfo:
+      type: object
+      required: [id, username]
+      properties:
+        id: { type: integer, format: int64, example: 1 }
+        username: { type: string, example: linzihang }
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    ApiResponseAuthToken:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/AuthToken"
+
+    ApiResponseUserInfo:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/UserInfo"
+
+# ============================================================
+# 非 OpenAPI 标准字段，供团队对齐全队约定（评审重点）
+# ============================================================
+x-conventions:
+  freeze:
+    frozen_at: 2026-10-24
+    frozen_at_1_3_0: 2026-11-17
+    review_gate: 2026-10-24 由 P1 林子航裁定提前冻结（未经集体评审，D1 站会向全员通报）
+    review_gate_1_3_0: |
+      2026-11-17 由 P1 拍板冻结，沿用 1.0.0 的先例：**先冻结、11-19 例会向全员通报，不等回执**。
+      冻结即生效——各组按本文件开工，发现与实现冲突时找 P1 升版本，不得私改本文件。
+    change_policy: 冻结后任何字段增删改必须经 P1，并全员通知，同步更新本文件版本号
+    version_rule:
+      patch_1_0_x: 新增可选字段、补充注释、修正文案 —— 直接改，版本 +0.0.1，群里说一声
+      minor_1_1_0: 新增接口、新增必填字段 —— 必须改，版本 +0.1.0，P1 通知全员并同步改前后端
+      major_2_0_0: 删除/重命名字段、改语义（如页码起点） —— 禁止在 Alpha 内发生，只能进 Beta
+    who_approves: P1 林子航（各组员不得私自改本文件）
+    changelog:
+      - version: 1.0.0
+        date: 2026-10-24
+        note: 首次冻结（P1 提前裁定，D1 站会通报全员）
+      - version: 1.0.1
+        date: 2026-11-05
+        note: 内部服务契约拆出解析 180 秒 / 问答 25 秒；bbox 坐标系补 #7 预研结论
+      - version: 1.0.2
+        date: 2026-11-06
+        note: AskRequest 新增 apiKey / baseUrl / model（密钥不得落库、不得写日志、不得回显）
+      - version: 1.1.0
+        date: 2026-11-08
+        note: |
+          延展段把 Beta 两项主菜提前，minor 升级：
+          1. /api/search 由预留转实装（arXiv 主源 + OpenAlex 兜底，10 秒超时降级、24 小时缓存），响应增 degraded / cached
+          2. 新增 POST /api/papers/import：检索结果一键入库并返回 paperId
+          3. Citation 增 bboxMode（precise / block / null），bbox 四字段由 null 改为真实填充
+          4. 新增错误码 3003 AI_SERVICE_AUTH_ERROR（HTTP 400），替代此前误用的 2002
+          5. 时间约定补充：必须返回带时区语义的 Asia/Shanghai 时间，禁止裸字符串
+      - version: 1.2.0
+        date: 2026-11-10
+        note: |
+          新增 POST /api/explain（#42 划词翻译 / 术语解释）：
+          1. paperId 可空：未入库论文也可翻译，只是不查库内上下文
+          2. context 可选：前端可传当前页少量上下文；服务端最多取 600 字
+          3. 选中文本超过 1000 字截断，响应 truncated=true
+          4. apiKey / baseUrl / model 与问答一致，为空时用服务端 .env
+      - version: 1.3.0-frozen
+        date: 2026-11-17
+        status: frozen（P1 拍板提前冻结，11-19 例会通报全员，**不等回执**）
+        note: |
+          Beta 第一周契约升级（#51 #52 #53），三项拍板结论已写入：
+          1. **越权口径 = 2001 + HTTP 404**（不采用 403，避免枚举他人文献）
+          2. **token 有效期 = 12 小时**
+          3. **不做刷新令牌**（记入 RC 备选）
+
+          具体改动：
+          1. **auth 四接口**：POST /api/auth/register、POST /api/auth/login、GET /api/auth/me、POST /api/auth/logout；新增 securitySchemes.bearerAuth
+          2. **错误码新开 6001–6003 段**：6001 用户名或密码不正确 / 6002 登录已失效 / 6003 用户名已被占用
+             ⚠️ **不能用 4001/4002**——4001 已被 STORAGE_ERROR 占用，这是本次发现并避开的冲突
+          3. **Citation 增 readingOrder**（页内阅读顺序，可空），配合 chunks.reading_order
+          4. **划词低质输入拦截规则**写入 explain_guard：空 / 长度<2 / 纯数字 → 前端不弹浮层
+          5. tags 中 search 的「Beta 预留」更正为「1.1.0 起实装」
+
+  # ↓↓↓ 1.3.0 新增：三条全队约定（#51 #52 #53） ↓↓↓
+  auth:
+    header: "Authorization: Bearer <token>"
+    issued_by: "POST /api/auth/register、POST /api/auth/login"
+    token_ttl_hours: 12
+    password_hash: bcrypt（cost 由实现定，最低 10）
+    invariants:
+      - 密码明文只在传输中出现一次，服务端**不落库、不写日志、不回显**
+      - 账号不存在与密码错误返回**同一个 6001**，不得泄露用户名是否存在
+      - 令牌过期 / 签名被篡改 → 6002 + HTTP 401，前端据此清本地令牌并跳登录
+      - 受保护接口：除 `/api/auth/register`、`/api/auth/login` 外，其余全部需要令牌
+    decided:
+      - "token 有效期 12 小时（2026-11-17 P1 拍板）"
+      - "不做刷新令牌，记入 RC 备选（2026-11-17 P1 拍板）"
+      - "登录后 12 小时内不需要重新输密码；过期一律 6002，前端自动跳登录"
+
+  authz:
+    strategy: 越权一律按「资源不存在」处理，不返回 403
+    code: 2001
+    http: 404
+    reason: |
+      返回 403 等于告诉攻击者「这个 id 存在，只是不属于你」，可被用来枚举他人文献。
+      统一按「不存在」处理，越权与真的不存在在响应上完全一致。
+      前端也不需要为 403 单独做一套提示。
+    applies_to:
+      - GET    /api/papers/{paperId}
+      - DELETE /api/papers/{paperId}
+      - GET    /api/papers/{paperId}/file
+      - POST   /api/qa/ask
+      - POST   /api/explain
+      - POST   /api/papers/import（归属当前用户，不存在越权问题，但同样不得读到他人已有记录）
+    invariant: 越权响应**不得携带他人任何业务字段**，连标题都不许回显
+    decided: 2026-11-17 P1 拍板采用 2001（不采用 403），**已冻结，不再接受二选一争论**
+
+  reading_order:
+    field_interface: readingOrder（citations[] 内）
+    field_db: chunks.reading_order（INT，可空）
+    semantics: |
+      页内阅读顺序，从 0 起。由 AI 服务按 (band, column, y0, x0) 排出：
+      先按「横跨整页的块」把页面切成若干横带（band），带内再按栏间空白分左右栏（column），
+      同栏内从上到下、从左到右。跨栏块 column=-1，排在本带末尾。
+    nullable_policy: |
+      历史数据为 null；前端**不得**依赖该字段定位，只能用于排序与排查。
+      真正的定位依据仍是 page + bboxX0/Y0/X1/Y1。
+    ddl: "ALTER TABLE chunks ADD COLUMN IF NOT EXISTS reading_order INT;"
+
+  explain_guard:
+    owner: P3（前端拦截）
+    rule: |
+      选中文本去除首尾空白后，满足以下任一条件时**不弹浮层、不发请求**：
+      - 为空
+      - 长度 < 2
+      - 全是数字（含数字与标点）
+    reason: 选空白或单个字符就弹浮层，用户会以为程序抽风；后端虽会返回 1001，但请求不该发出。
+    related_case: F7-04（Alpha 判「不适用」，Beta 补规则后应改判「通过」）
+    pending: 契约先有条款，代码随后（#67）
+
+  # ↑↑↑ 1.3.0 新增结束 ↑↑↑
+
+  pagination:
+    page_starts_at: 1
+    default_size: 20
+    max_size: 100
+
+  coordinate:
+    page_starts_at: 1
+    bbox_normalized: true
+    bbox_range: "0.0 ~ 1.0"
+    bbox_origin: 左上角为原点，x 向右、y 向下
+    bbox_relative_to: 单页宽度 / 单页高度
+    alpha_behavior: ❌ 已作废（1.0.x 写「四个 bbox 字段一律返回 null」）—— 1.1.0 起真实填充
+    behavior_1_1_0: "单栏论文返回精确块坐标并标 bboxMode=precise；双栏或复杂版面降级为整块范围并标 bboxMode=block；确实无法定位时四个字段为 null 且 bboxMode 为 null，前端退回「只跳页不画框」"
+    bbox_mode_field: "接口字段 bboxMode（camelCase）；数据库列建议 bbox_mode（可空，取值 precise/block）；AI 服务内部为 bbox_mode"
+    bbox_mode_db_status: "⚠️ 2026-11-08 核对：docs/契约/03-数据库表结构.sql 只有 bbox_x0/y0/x1/y1，尚无 bbox_mode 列，需 P6 补迁移"
+    bbox_mode_ddl: "ALTER TABLE chunks ADD COLUMN bbox_mode TEXT CHECK (bbox_mode IN ('precise','block'));"
+    # ↓ 1.0.1 新增：来自 P2 #7 预研结论，详见 docs/契约/bbox坐标约定.md
+    page_meaning: 使用物理页码（封面、目录计入页数），不使用 PDF 内置页码标签 label
+    rotated_page: 旋转页建系不变（原点仍在左上），分母使用旋转后用户看到的当页宽高
+    bbox_constraint: 0 ≤ bboxX0 < bboxX1 ≤ 1 且 0 ≤ bboxY0 < bboxY1 ≤ 1，宽高必须为正，不允许相等
+    bbox_field_names: 接口字段为 bboxX0/bboxY0/bboxX1/bboxY1；数据库列为 bbox_x0/y0/x1/y1；doc 里的 x0/y0/x1/y1 只是简写，不得作为接口字段名
+
+  upload:
+    accepted_types: [application/pdf]
+    max_file_size_mb: 50
+    max_pages_warn: 200
+    storage: 本地磁盘，路径由后端配置，不得对外暴露
+
+  timeout:
+    qa_ask_seconds: 30
+    upstream_ai_seconds: 25
+
+  error_codes:
+    description: 统一返回 {code, message, data}；code=0 表示成功
+    table:
+      - { code: 0,     http: 200, name: OK,                message: "成功" }
+      - { code: 1001,  http: 400, name: INVALID_PARAM,     message: "参数缺失或格式错误" }
+      - { code: 1002,  http: 400, name: FILE_NOT_PDF,      message: "仅支持 PDF 文件" }
+      - { code: 1003,  http: 400, name: FILE_TOO_LARGE,    message: "文件超过 50MB" }
+      - { code: 1004,  http: 400, name: PAGE_OUT_OF_RANGE, message: "页码从 1 开始，超出文档页数" }
+      - { code: 2001,  http: 404, name: PAPER_NOT_FOUND,   message: "文献不存在" }
+      - { code: 2002,  http: 409, name: PAPER_NOT_READY,   message: "文献尚未解析完成，暂时无法提问" }
+      - { code: 2003,  http: 422, name: EMPTY_QUESTION,    message: "问题不能为空" }
+      - { code: 3001,  http: 502, name: AI_SERVICE_ERROR,  message: "AI 服务调用失败" }
+      - { code: 3002,  http: 504, name: AI_SERVICE_TIMEOUT,message: "AI 服务超时（>30s）" }
+      # ↓ 1.1.0 新增（2026-11-08）：用户自填的 API Key 无效时专用。
+      #   不复用 2002（那是文献未解析完成）：Key 错却显示「文献还在解析」，用户会一直等一个永不结束的状态。
+      #   不复用 3001（那是 502，语义是「我方服务故障」）：Key 错属于用户可自改的错误，应给 400。
+      #   不用 401：本项目无登录态，401 会被前端通用拦截误判为「会话失效」。
+      - { code: 3003,  http: 400, name: AI_SERVICE_AUTH_ERROR, message: "API Key 无效，请到设置页检查" }
+      - { code: 4001,  http: 500, name: STORAGE_ERROR,     message: "文件存储失败" }
+      # ↓ 1.3.0 新增（2026-11-17）：auth 段。
+      #   注意：**不能用 4001/4002** —— 4001 已被 STORAGE_ERROR 占用。
+      #   不复用 2001：那是「文献不存在」，登录失败用它会误导前端跳转逻辑。
+      #   6001 同时覆盖「用户名不存在」与「密码错误」，防止探测账号是否存在。
+      - { code: 6001,  http: 401, name: AUTH_INVALID_CREDENTIALS, message: "用户名或密码不正确" }
+      - { code: 6002,  http: 401, name: AUTH_TOKEN_INVALID,       message: "登录已失效，请重新登录" }
+      - { code: 6003,  http: 400, name: AUTH_USERNAME_TAKEN,      message: "该用户名已被占用" }
+      - { code: 5000,  http: 500, name: INTERNAL_ERROR,    message: "服务器内部错误" }
+
+  who_owns:
+    upload_and_crud: P4 刘万礼
+    qa_forward: P4 刘万礼
+    parse_and_retrieval: P5 吴啸天
+    pdf_render_and_jump: P2 杨靖
+    pages_and_sidebar: P3 杨绎平

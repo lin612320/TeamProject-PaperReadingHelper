@@ -1,24 +1,34 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onBeforeUnmount, shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { getPaper, askQuestion } from '../api/papers'
+import { getPaper, askQuestion, explainText } from '../api/papers'
+import { useSettings } from '../composables/useSettings'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
 const route = useRoute()
+const { settings, isConfigured } = useSettings()
 const paperId = Number(route.params.paperId)
 
 
 const PDF_API_BASE = import.meta.env.VITE_API_BASE || ''
 const FALLBACK_SAMPLE = '/sample.pdf'
 
-// 将 pdf.js 抛出的技术错误转换为人话
 function formatPdfError(error) {
   const msg = error?.message || ''
-  // 已经是中文人话（如开发提示），直接返回
+
   if (/[\u4e00-\u9fa5]/.test(msg)) return msg
+  if (
+    msg.includes('fake worker') ||
+    msg.includes('Failed to load module script') ||
+    msg.includes('MIME type') ||
+    msg.includes('workerSrc') ||
+    msg.includes('Cannot use the specified')
+  ) {
+    return 'PDF 渲染组件加载失败，请刷新页面重试；若持续出现，请联系管理员检查静态资源配置'
+  }
   if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('server response')) {
     return '无法连接到服务器，请检查网络或后端服务是否启动'
   }
@@ -35,6 +45,8 @@ function formatPdfError(error) {
 }
 
 const canvasEls = new Map()
+const textLayerEls = new Map()
+const textLayerTasks = new Map()
 const pdfLoading = ref(true)
 const pdfErrorMessage = ref('')
 const usingSample = ref(false)
@@ -48,7 +60,7 @@ let renderTasks = []
 const ZOOM_MIN = 0.6
 const ZOOM_MAX = 2.4
 const ZOOM_STEP = 0.2
-const BASE_SCALE = 1.4 // 自适应宽度时的基准倍率，超过它才允许横向滚动
+const BASE_SCALE = 1.4 // 自适应宽度时的基准倍率
 
 const scrollContainer = ref(null)
 const pageEls = new Map()
@@ -73,6 +85,11 @@ const canZoomOut = computed(
 function setCanvasEl(pageNumber, el) {
   if (el) canvasEls.set(pageNumber, el)
   else canvasEls.delete(pageNumber)
+}
+
+function setTextLayerEl(pageNumber, el) {
+  if (el) textLayerEls.set(pageNumber, el)
+  else textLayerEls.delete(pageNumber)
 }
 
 function setPageEl(pageNumber, el) {
@@ -105,6 +122,19 @@ async function renderAllPages({ resetProgress = true } = {}) {
   // 缩放重绘时不重置，避免整片画布闪白
   if (resetProgress) renderedPages.value = 0
 
+  // 重渲染前清除旧 text layer 任务和内容
+  textLayerTasks.forEach((t) => {
+    try {
+      t.cancel?.()
+    } catch {
+      // 忽略
+    }
+  })
+  textLayerTasks.clear()
+  textLayerEls.forEach((el) => {
+    if (el) el.textContent = ''
+  })
+
   try {
     for (let pageNumber = 1; pageNumber <= pdfDoc.value.numPages; pageNumber++) {
       const canvas = canvasEls.get(pageNumber)
@@ -123,6 +153,28 @@ async function renderAllPages({ resetProgress = true } = {}) {
       renderTasks.push(task)
       await task.promise
       renderedPages.value = pageNumber
+
+      // 渲染 text layer，让文字可选中
+      const textLayerEl = textLayerEls.get(pageNumber)
+      if (textLayerEl) {
+        const textContent = await page.getTextContent()
+        const textLayer = new pdfjsLib.TextLayer({
+          textContentSource: textContent,
+          container: textLayerEl,
+          viewport,
+        })
+        textLayerTasks.set(pageNumber, textLayer)
+        await textLayer.render()
+
+        // canvas 可能被 max-width:100% 缩放，让 text layer 跟随显示尺寸
+        // 通过设置 --total-scale-factor 让 pdfjs 自己计算容器尺寸和字体大小
+        const { pageWidth } = viewport.rawDims
+        requestAnimationFrame(() => {
+          // 用 clientWidth（不含 border），避免边框导致的偏移
+          const displayScale = canvas.clientWidth / pageWidth
+          textLayerEl.style.setProperty('--total-scale-factor', displayScale)
+        })
+      }
     }
   } catch (error) {
     const friendly = formatPdfError(error)
@@ -140,6 +192,7 @@ async function loadDocument() {
   renderedPages.value = 0
   currentPage.value = 1
   pageInput.value = 1
+  clearCitationHighlight()
 
   try {
     pdfDoc.value = await openDocument()
@@ -161,7 +214,7 @@ function pageOffsetTop(el, container) {
   return el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
 }
 
-// 取「视口上部 30% 处」所在页作为当前页 
+// 取视口上部 30% 处所在页作为当前页 
 function updateCurrentPage() {
   const container = scrollContainer.value
   const total = pageCount.value
@@ -188,7 +241,7 @@ function handleScroll() {
   })
 }
 
-// 滚动到指定页（页码会被夹到 1..pageCount） 
+// 滚动到指定页，页码会被夹到 1..pageCount
 function goToPage(target, smooth = true) {
   const container = scrollContainer.value
   const total = pageCount.value
@@ -206,7 +259,7 @@ function goToPage(target, smooth = true) {
   })
 }
 
-// 页码输入框：回车 / 失焦时跳转，非法值回退 
+// 页码输入框：回车、失焦时跳转，非法值回退 
 function commitPageInput() {
   editingPage.value = false
   const target = Number(pageInput.value)
@@ -222,24 +275,86 @@ function commitPageInput() {
 const flashPageNumber = ref(0)
 let flashTimer = 0
 
+// ===== #41 引用 bbox 高亮层 =====
+const citationHighlight = ref(null)
+let citationHighlightTimer = 0
+let citationHighlightSeq = 0
+
 /** 页码是否有效（1..pageCount），防止后端脏数据导致跳转异常 */
 function isValidPage(page) {
   const n = Number(page)
   return Number.isFinite(n) && n >= 1 && n <= pageCount.value
 }
 
-/** 点击引用页码：跳到对应页，并短暂高亮该页 */
-function jumpToCitation(page) {
-  if (!isValidPage(page)) return
+/**
+ * 把 citation 的归一化 bbox 转成相对页面的 CSS 百分比。
+ * 无效 / 四字段为 null / 面积过小 → 返回 null，调用方退回“只跳页不画框”。
+ */
+function citationBoxStyle(cite) {
+  if (!cite) return null
 
-  const target = Number(page)
-  goToPage(target)
+  const raw = [cite.bboxX0, cite.bboxY0, cite.bboxX1, cite.bboxY1]
+  if (raw.some((v) => v === null || v === undefined || v === '')) return null
 
-  flashPageNumber.value = target
+  const values = raw.map(Number)
+  if (!values.every(Number.isFinite)) return null
+
+  const left = Math.max(0, Math.min(1, Math.min(values[0], values[2])))
+  const top = Math.max(0, Math.min(1, Math.min(values[1], values[3])))
+  const right = Math.max(0, Math.min(1, Math.max(values[0], values[2])))
+  const bottom = Math.max(0, Math.min(1, Math.max(values[1], values[3])))
+
+  if (right - left < 0.002 || bottom - top < 0.002) return null
+
+  return {
+    left: `${left * 100}%`,
+    top: `${top * 100}%`,
+    width: `${(right - left) * 100}%`,
+    height: `${(bottom - top) * 100}%`,
+  }
+}
+
+function clearCitationHighlight() {
+  clearTimeout(citationHighlightTimer)
+  citationHighlightTimer = 0
+  citationHighlight.value = null
+}
+
+/** bboxMode=null 时的降级：只闪一下目标页，不画框 */
+function flashPage(page) {
+  flashPageNumber.value = page
   clearTimeout(flashTimer)
   flashTimer = setTimeout(() => {
     flashPageNumber.value = 0
   }, 1200)
+}
+
+/** 点击引用：跳页 + 画半透明 bbox 框；无坐标时只跳页 */
+function jumpToCitation(cite) {
+  if (!cite || !isValidPage(cite.page)) return
+
+  const target = Math.floor(Number(cite.page))
+  goToPage(target)
+  clearCitationHighlight()
+
+   const style = citationBoxStyle(cite)
+  if (!style) {
+    flashPage(target)
+    return
+  }
+
+  citationHighlight.value = {
+    page: target,
+    style,
+    // precise = 单栏细框；block = 双栏/复杂版面的整段框，用虚线区分
+    mode: cite.bboxMode === 'block' ? 'block' : 'precise',
+    key: ++citationHighlightSeq,
+  }
+
+  // 2.8 秒后移除；快速连点会先清掉上一个 timer
+  citationHighlightTimer = setTimeout(() => {
+    citationHighlight.value = null
+  }, 2800)
 }
 
 // 缩放前记录「当前页 + 页内偏移比例」，重绘后滚回同一位置 
@@ -298,6 +413,7 @@ const pageError = ref('')
 
 const question = ref('')
 const sending = ref(false)
+const questionInput = ref(null)
 
 const chatItems = ref([])
 
@@ -349,7 +465,8 @@ async function handleSend() {
   scrollToBottom()
 
   try {
-    const data = await askQuestion(paperId, q)
+    const aiConfig = isConfigured() ? settings.value : null
+    const data = await askQuestion(paperId, q, aiConfig)
     const idx = chatItems.value.findIndex((item) => item.id === aId)
     if (idx !== -1) {
       chatItems.value[idx] = {
@@ -393,7 +510,8 @@ async function handleRetry(questionText) {
   scrollToBottom()
 
   try {
-    const data = await askQuestion(paperId, questionText)
+    const aiConfig = isConfigured() ? settings.value : null
+    const data = await askQuestion(paperId, questionText, aiConfig)
     const idx = chatItems.value.findIndex((item) => item.id === aId)
     if (idx !== -1) {
       chatItems.value[idx] = {
@@ -418,9 +536,156 @@ async function handleRetry(questionText) {
   }
 }
 
+// ===== #42 划词翻译 / 术语解释 =====
+const MAX_CONTEXT = 600
+
+const selectedText = ref('')
+const selectionRange = ref(null)
+const explainBubbleVisible = ref(false)
+const explainBubbleStyle = ref({ top: '0px', left: '0px' })
+const explainPanelVisible = ref(false)
+const explainPanelStyle = ref({ top: '0px', left: '0px' })
+const explainLoading = ref(false)
+const explainMode = ref('translate')
+const explainResult = ref(null)
+const explainError = ref('')
+const explainTruncated = ref(false)
+const explainCopied = ref(false)
+
+function getSelectionContext() {
+  const sel = window.getSelection()
+  if (!sel || sel.rangeCount === 0 || !selectedText.value) return null
+
+  const range = sel.getRangeAt(0)
+  const container = range.commonAncestorContainer
+  const textLayerEl = container.nodeType === 1 ? container.closest('.text-layer') : container.parentElement?.closest('.text-layer')
+  if (!textLayerEl) return null
+
+  const fullText = textLayerEl.textContent || ''
+  const selText = selectedText.value
+  const idx = fullText.indexOf(selText)
+  if (idx === -1) return null
+
+  const half = Math.floor(MAX_CONTEXT / 2)
+  const start = Math.max(0, idx - half)
+  const end = Math.min(fullText.length, idx + selText.length + half)
+  return fullText.slice(start, end)
+}
+
+function handleSelection() {
+  if (explainLoading.value) return
+
+  const sel = window.getSelection()
+  const text = sel?.toString().trim() || ''
+
+  if (!text) {
+    explainBubbleVisible.value = false
+    return
+  }
+
+  // 只在 PDF 区域内的选区显示气泡
+  const anchorNode = sel.anchorNode
+  if (!anchorNode) return
+  const el = anchorNode.nodeType === 1 ? anchorNode : anchorNode.parentElement
+  if (!el?.closest('.text-layer')) return
+
+  selectedText.value = text
+  selectionRange.value = sel.getRangeAt(0).cloneRange()
+
+  // 计算气泡位置（选区上方居中）
+  const rect = sel.getRangeAt(0).getBoundingClientRect()
+  const scrollRect = scrollContainer.value?.getBoundingClientRect()
+  if (!scrollRect) return
+
+  explainBubbleStyle.value = {
+    top: `${rect.top - scrollRect.top + scrollContainer.value.scrollTop - 40}px`,
+    left: `${rect.left - scrollRect.left + scrollContainer.value.scrollLeft + rect.width / 2 - 90}px`,
+  }
+  explainBubbleVisible.value = true
+}
+
+async function runExplain(mode) {
+  explainMode.value = mode
+  explainLoading.value = true
+  explainError.value = ''
+  explainResult.value = null
+  explainTruncated.value = false
+  explainBubbleVisible.value = false
+
+  // 浮层位置：选区下方
+  if (selectionRange.value) {
+    const rect = selectionRange.value.getBoundingClientRect()
+    const scrollRect = scrollContainer.value?.getBoundingClientRect()
+    if (scrollRect) {
+      explainPanelStyle.value = {
+        top: `${rect.bottom - scrollRect.top + scrollContainer.value.scrollTop + 8}px`,
+        left: `${Math.max(8, rect.left - scrollRect.left + scrollContainer.value.scrollLeft)}px`,
+      }
+    }
+  }
+  explainPanelVisible.value = true
+
+  try {
+    const aiConfig = isConfigured() ? settings.value : null
+    const context = getSelectionContext()
+    const data = await explainText(selectedText.value, mode, {
+      paperId: paperId || null,
+      context,
+      aiConfig,
+    })
+    explainResult.value = data
+    explainTruncated.value = data?.truncated === true
+  } catch (error) {
+    explainError.value = error.message || '解释请求失败'
+  } finally {
+    explainLoading.value = false
+  }
+}
+
+function retryExplain() {
+  runExplain(explainMode.value)
+}
+
+function copyExplainResult() {
+  if (!explainResult.value) return
+  const content = explainMode.value === 'translate'
+    ? explainResult.value.translation
+    : explainResult.value.explanation
+  if (!content) return
+  navigator.clipboard?.writeText(content).then(() => {
+    explainCopied.value = true
+    setTimeout(() => {
+      explainCopied.value = false
+    }, 1500)
+  })
+}
+
+function closeExplainPanel() {
+  explainPanelVisible.value = false
+  explainResult.value = null
+  explainError.value = ''
+  explainLoading.value = false
+  explainTruncated.value = false
+  explainCopied.value = false
+  window.getSelection()?.removeAllRanges()
+  selectedText.value = ''
+}
+
+function handleDocumentMouseUp(e) {
+  // 点击浮层/气泡内不处理
+  if (e.target.closest('.explain-bubble') || e.target.closest('.explain-panel')) return
+  nextTick(() => handleSelection())
+}
+
 onMounted(async () => {
   await loadPaper()
   await loadDocument()
+  document.addEventListener('mouseup', handleDocumentMouseUp)
+  if (route.query.focus === 'qa') {
+    nextTick(() => {
+      questionInput.value?.focus()
+    })
+  }
 })
 
 watch(
@@ -434,11 +699,13 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  document.removeEventListener('mouseup', handleDocumentMouseUp)
   if (scrollRafId) {
     cancelAnimationFrame(scrollRafId)
     scrollRafId = 0
   }
   clearTimeout(flashTimer)
+  clearCitationHighlight()
   renderTasks.forEach((task) => {
     try {
       task.cancel()
@@ -447,11 +714,20 @@ onBeforeUnmount(() => {
     }
   })
   renderTasks = []
+  textLayerTasks.forEach((t) => {
+    try {
+      t.cancel?.()
+    } catch {
+      // 忽略
+    }
+  })
+  textLayerTasks.clear()
   if (typeof pdfDoc.value?.destroy === 'function') {
     pdfDoc.value.destroy()
   }
   pdfDoc.value = null
   canvasEls.clear()
+  textLayerEls.clear()
 })
 </script>
 
@@ -564,6 +840,74 @@ onBeforeUnmount(() => {
               class="pdf-canvas"
               :class="{ 'is-rendered': n <= renderedPages }"
             ></canvas>
+            <div :ref="(el) => setTextLayerEl(n, el)" class="text-layer"></div>
+            <!-- #41 引用 bbox 高亮层：百分比定位，随缩放/旋转页自动对齐 -->
+            <div
+              v-if="citationHighlight && citationHighlight.page === n"
+              :key="citationHighlight.key"
+              class="citation-highlight-layer"
+              aria-hidden="true"
+            >
+              <div
+                class="citation-highlight"
+                :class="{ 'is-block': citationHighlight.mode === 'block' }"
+                :style="citationHighlight.style"
+              ></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 划词操作气泡 -->
+        <div
+          v-if="explainBubbleVisible"
+          class="explain-bubble"
+          :style="explainBubbleStyle"
+        >
+          <button class="explain-bubble-btn" @click.stop="runExplain('translate')">翻译</button>
+          <span class="explain-bubble-sep"></span>
+          <button class="explain-bubble-btn" @click.stop="runExplain('term')">解释</button>
+        </div>
+
+        <!-- 解释结果浮层 -->
+        <div
+          v-if="explainPanelVisible"
+          class="explain-panel"
+          :style="explainPanelStyle"
+          @click.stop
+        >
+          <div class="explain-panel-header">
+            <span class="explain-mode-tag">
+              {{ explainMode === 'translate' ? '翻译' : '术语解释' }}
+            </span>
+            <button class="explain-close-btn" @click.stop="closeExplainPanel" aria-label="关闭">×</button>
+          </div>
+
+          <p v-if="explainTruncated" class="explain-truncated-hint">
+            选中文本超过 1000 字，已截断处理
+          </p>
+
+          <div v-if="explainLoading" class="explain-loading">
+            <span class="spinner"></span>
+            <span>正在{{ explainMode === 'translate' ? '翻译' : '解释' }}…</span>
+          </div>
+
+          <div v-else-if="explainError" class="explain-error">
+            <p class="explain-error-text">{{ explainError }}</p>
+            <button class="btn-retry" @click.stop="retryExplain">重试</button>
+          </div>
+
+          <div v-else-if="explainResult" class="explain-result">
+            <p v-if="explainMode === 'translate'" class="explain-content">
+              {{ explainResult.translation }}
+            </p>
+            <p v-else class="explain-content">
+              {{ explainResult.explanation }}
+            </p>
+            <div class="explain-actions">
+              <button class="explain-copy-btn" @click.stop="copyExplainResult">
+                {{ explainCopied ? '已复制' : '复制' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -626,7 +970,7 @@ onBeforeUnmount(() => {
                     class="citation-page"
                     :disabled="!pageCount || pdfLoading || !isValidPage(cite.page)"
                     :title="`跳转到第 ${cite.page} 页`"
-                    @click="jumpToCitation(cite.page)"
+                    @click="jumpToCitation(cite)"
                   >
                     第 {{ cite.page }} 页
                   </button>
@@ -642,8 +986,14 @@ onBeforeUnmount(() => {
         <p>在下方输入问题，开始向 AI 提问这篇论文。</p>
       </div>
 
+      <div v-if="!isConfigured()" class="qa-config-notice">
+        <span>尚未配置 API Key，</span>
+        <RouterLink to="/settings">前往设置</RouterLink>
+      </div>
+
       <div class="qa-input-area">
         <textarea
+          ref="questionInput"
           v-model="question"
           class="qa-textarea"
           rows="2"
@@ -734,6 +1084,7 @@ onBeforeUnmount(() => {
 }
 
 .canvas-wrap {
+  position: relative;
   flex: 1;
   overflow-y: auto;
   padding: 16px 0;
@@ -755,6 +1106,7 @@ onBeforeUnmount(() => {
 }
 
 .page {
+  position: relative;
   line-height: 0;
 }
 
@@ -772,6 +1124,233 @@ onBeforeUnmount(() => {
 
 .pdf-canvas.is-rendered {
   opacity: 1;
+}
+
+/* text layer：覆盖在 canvas 上，文字透明可选 */
+.text-layer {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  overflow: hidden;
+  line-height: 1;
+  pointer-events: auto;
+  --total-scale-factor: 1;
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+}
+
+.text-layer :deep(span) {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  font-size: calc(var(--font-height, 0) * var(--total-scale-factor));
+  transform: scaleX(var(--scale-x, 1)) rotate(var(--rotate, 0deg));
+}
+
+.text-layer :deep(.markedContent) {
+  position: absolute;
+  inset: 0;
+}
+
+.text-layer :deep(::selection) {
+  background: rgb(59 130 246 / 30%);
+}
+
+/* ===== #41 引用 bbox 高亮层 ===== */
+.citation-highlight-layer {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: calc(100% - 2px);
+  height: calc(100% - 2px);
+  z-index: 15;
+  pointer-events: none;
+}
+
+.citation-highlight {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid #f59e0b;
+  border-radius: 3px;
+  background: rgb(245 158 11 / 18%);
+  box-shadow: 0 0 0 2px rgb(245 158 11 / 12%);
+  animation: citation-highlight-fade 2.6s ease-out forwards;
+}
+
+/* 双栏/复杂版面：bboxMode=block，用虚线提示“整段范围”，不冒充逐句精确 */
+.citation-highlight.is-block {
+  border-color: #2563eb;
+  border-style: dashed;
+  background: rgb(37 99 235 / 14%);
+  box-shadow: 0 0 0 2px rgb(37 99 235 / 10%);
+}
+
+@keyframes citation-highlight-fade {
+  0% { opacity: 0; }
+  8% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* bboxMode=null：契约要求“只跳页不画框”，这里只闪一下目标页 */
+.page-flash::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 14;
+  border: 2px solid rgb(37 99 235 / 55%);
+  border-radius: 4px;
+  pointer-events: none;
+  animation: page-flash-fade 1.1s ease-out forwards;
+}
+
+@keyframes page-flash-fade {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ===== #42 划词翻译气泡 ===== */
+.explain-bubble {
+  position: absolute;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  background: #1e293b;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 20%);
+  padding: 2px;
+}
+
+.explain-bubble-btn {
+  padding: 6px 14px;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.explain-bubble-btn:hover {
+  background: #334155;
+}
+
+.explain-bubble-sep {
+  width: 1px;
+  height: 16px;
+  background: #475569;
+}
+
+/* ===== #42 解释结果浮层 ===== */
+.explain-panel {
+  position: absolute;
+  z-index: 50;
+  width: 340px;
+  max-width: calc(100% - 16px);
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgb(15 23 42 / 12%);
+  overflow: hidden;
+}
+
+.explain-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.explain-mode-tag {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2563eb;
+}
+
+.explain-close-btn {
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.explain-close-btn:hover {
+  color: #475569;
+}
+
+.explain-truncated-hint {
+  margin: 0;
+  padding: 8px 14px;
+  font-size: 12px;
+  color: #b45309;
+  background: #fef3c7;
+}
+
+.explain-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 14px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.explain-error {
+  padding: 16px 14px;
+  text-align: center;
+}
+
+.explain-error-text {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #dc2626;
+}
+
+.explain-result {
+  padding: 14px;
+}
+
+.explain-content {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #1e293b;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.explain-actions {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 10px;
+}
+
+.explain-copy-btn {
+  padding: 5px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.explain-copy-btn:hover {
+  border-color: #93b4f5;
+  color: #2563eb;
 }
 
 /* ===== #6 翻页 / 缩放 ===== */
@@ -1103,6 +1682,26 @@ onBeforeUnmount(() => {
   text-align: center;
   color: #94a3b8;
   font-size: 14px;
+}
+
+/* 未配置 API Key 提示 */
+.qa-config-notice {
+  padding: 8px 16px;
+  background: #fffbeb;
+  border-top: 1px solid #fde68a;
+  color: #92400e;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.qa-config-notice a {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.qa-config-notice a:hover {
+  text-decoration: underline;
 }
 
 /* 输入区域 */

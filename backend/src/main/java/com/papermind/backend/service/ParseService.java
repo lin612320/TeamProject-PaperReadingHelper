@@ -20,11 +20,9 @@ public class ParseService {
     @Value("${app.parse.mock:true}")
     private boolean mock;
 
-    /** 是否强制重建已有切片（契约 force 字段），默认 false */
     @Value("${app.parse.force:false}")
     private boolean force;
 
-    /** 解析接口超时（秒）。CPU 上 bge-m3 约 0.7 秒/切片，20 页论文约 60 秒起 */
     @Value("${app.parse.timeout-seconds:180}")
     private long parseTimeoutSeconds;
 
@@ -58,7 +56,6 @@ public class ParseService {
                 String json = new com.fasterxml.jackson.databind.ObjectMapper()
                     .writeValueAsString(req);
 
-                // AI 服务（uvicorn）不支持 h2c 升级，必须强制 HTTP/1.1，否则请求体会丢失
                 java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()
                     .version(java.net.http.HttpClient.Version.HTTP_1_1)
                     .connectTimeout(java.time.Duration.ofSeconds(3))
@@ -113,7 +110,6 @@ public class ParseService {
         }
     }
 
-    /** 统一写失败原因（BUG-008：不再只写 unknown error） */
     private void fail(Long paperId, String reason, Exception e) {
         log.error("parse failed, paperId={} reason={}", paperId, reason, e);
         jdbcTemplate.update(

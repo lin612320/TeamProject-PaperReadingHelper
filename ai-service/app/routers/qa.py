@@ -14,6 +14,10 @@ class AskRequest(BaseModel):
     question: str
     topK: int = 3
     maxCitations: int = 3
+    # 前端提供API Key，为空时再使用本地 .env 的配置
+    apiKey: str | None = None
+    baseUrl: str | None = None
+    model: str | None = None
 
 @router.post("/internal/qa/ask")
 def ask(body: AskRequest):
@@ -46,7 +50,15 @@ def ask(body: AskRequest):
     max_citations = min(max(body.maxCitations, 0), 5)
 
     try:
-        result = answer_question(body.paperId, question, top_k, max_citations)
+        result = answer_question(
+            body.paperId,
+            question,
+            top_k,
+            max_citations,
+            api_key=body.apiKey,
+            base_url=body.baseUrl,
+            model=body.model,
+        )
     except QaError as e:
         if e.code == "PAPER_NOT_FOUND":
             status = 404
@@ -56,6 +68,8 @@ def ask(body: AskRequest):
             status = 422
         elif e.code == "LLM_TIMEOUT":
             status = 504
+        elif e.code == "LLM_AUTH_ERROR":
+            status = 401
         else:
             status = 500
         return JSONResponse(

@@ -42,7 +42,43 @@ docker compose logs -f backend
 >
 > 问答需要 DeepSeek Key：在仓库根目录执行 `cp ai-service/.env.example .env`，填好 `DEEPSEEK_API_KEY`，再 `docker compose up -d`（compose 会自动读取根目录 `.env`）。不填也能起，但提问会报「未配置 DEEPSEEK_API_KEY」。
 >
-> 改过 SQL 必须 `docker compose down -v` 才生效。
+> 改过 `docs/契约/03-数据库表结构.sql` 后，**不要用 `docker compose down -v` 让它生效** —— `-v` 会连 `hf-cache`（2.2GB 向量模型）和 `uploads`（已上传的 PDF）一起删掉，模型没了就要重新联网下载，演示环境直接废掉。
+>
+> 正确做法二选一：
+>
+> - **给已有库补列**（推荐，幂等）：把 DDL 里新增的那条 `ALTER TABLE ...` 直接在库里执行一次，例如
+>   `docker compose exec -T postgres psql -U papermind -d papermind -c "ALTER TABLE chunks ADD COLUMN IF NOT EXISTS bbox_mode TEXT;"`
+> - **确实要重建库**：只删数据卷，别动其它卷 ——
+>   `docker compose stop postgres && docker volume rm papermind_pgdata && docker compose up -d postgres`
+>   （库里的论文记录会清空，需要重新上传）
+
+## 常见问题
+
+**1. 断网 / 镜像拉取失败**
+
+首次启动需要从 Docker Hub 拉取基础镜像（postgres、redis 等）。网络不通时会看到：
+
+```
+failed to resolve reference "docker.io/pgvector/pgvector:pg16":
+failed to do request: Head "https://registry-1.docker.io/v2/...": EOF
+```
+
+处理办法：
+
+- **有网时先预拉**：`docker compose pull`，成功后再 `docker compose up -d`
+- **完全离线**：在有网机器上 `docker compose build`，用 `docker save` 导出镜像、`docker load` 导入
+- **注意**：镜像已在本地时，断网不影响启动（`docker compose up -d` 仍可起全栈），只有拉取新镜像才会失败
+
+**2. 上传后解析一直失败（EMBEDDING_FAILED）**
+
+容器内没有 embedding 模型时，上传后会提示向量化失败。首次需将宿主机 `~/.cache/huggingface` 下的 `bge-m3` 拷入 `hf-cache` 卷，详见 `docs/测试/BugList.md` 的 BUG-012。
+
+```powershell
+docker run --rm `
+  -v "$env:USERPROFILE\.cache\huggingface:/host:ro" `
+  -v teamproject-paperreadinghelper_hf-cache:/data `
+  redis:7-alpine sh -c "cp -a /host/. /data/"
+```
 
 ## 分支规范（双分支）
 
@@ -71,23 +107,49 @@ feat|fix|docs|test|chore: 简述 (#IssueID)
 
 ## 文档索引
 
+> **2026-11-18 起 docs/ 按阶段分目录**：`docs/alpha/` 放 Alpha 阶段文档与测试，`docs/beta/` 放 Beta 阶段文档与测试；
+> 契约三件套、路线图、分工、SOP 等**跨轮共用**的仍留在 `docs/` 根。
+
+### 跨轮共用（根目录）
+
 | 文档 | 内容 |
 |---|---|
-| `docs/团队分工明细.md` | **七人分工、任务包、责任矩阵、越界红线、接口对接人** |
+| `docs/管理/团队分工明细.md` | **七人分工、任务包、责任矩阵、越界红线、接口对接人** |
 | `CONTRIBUTING.md` | **贡献规范：分支、提交格式、推送纪律、禁止提交项（新人必读）** |
-| `docs/01-api-contract.yaml` | **① 对外接口契约**（浏览器 ↔ Spring Boot，6 个接口） |
-| `docs/02-内部服务契约.yaml` | **② 内部服务契约**（Spring Boot ↔ FastAPI，4 个接口） |
-| `docs/03-数据库表结构.sql` | **③ 数据库表结构契约**（4 张表完整 DDL） |
-| docs/bbox坐标约定.md | 引用高亮坐标建系（P2↔P5 对接标准，#7 结论） |
-| `docs/契约评审要点.md` | D3 评审会：20 个拍板点 + 三份评审顺序 |
-| `docs/Alpha功能清单.md` | Alpha 四个功能与逐条验收标准 |
-| `docs/三轮功能路线图.md` | Alpha / Beta / RC 任务池与七人分工 |
-| `docs/Alpha_Issue清单.md` | 28 条 Issue，按 D1–D15 排期 |
-| `docs/全员必学清单.md` | D1–D3 全员学习清单与验收方式 |
+| `docs/契约/01-api-contract.yaml` | **① 对外接口契约**（浏览器 ↔ Spring Boot，1.3.0-frozen，11 个接口） |
+| `docs/契约/02-内部服务契约.yaml` | **② 内部服务契约**（Spring Boot ↔ FastAPI，4 个接口） |
+| `docs/契约/03-数据库表结构.sql` | **③ 数据库表结构契约**（4 张表完整 DDL） |
+| `docs/管理/三轮功能路线图.md` | Alpha / Beta / RC 任务池与七人分工 |
+| `docs/契约/bbox坐标约定.md` | 引用高亮坐标建系（P2↔P5 对接标准，#7 结论） |
+| `docs/契约/契约评审要点.md` | D3 评审会：20 个拍板点 + 三份评审顺序 |
+| `docs/alpha/全员必学清单.md` | D1–D3 全员学习清单与验收方式 |
+| `docs/测试/BugList.md` | 缺陷台账（跨轮累计，Beta 起累计至 BUG-022） |
+
+### Alpha 阶段（`docs/alpha/`）
+
+| 文档 | 内容 |
+|---|---|
+| `docs/alpha/Alpha功能清单.md` | Alpha 四个功能与逐条验收标准 |
+| `docs/alpha/Alpha_Issue清单.md` | 28 条 Issue，按 D1–D15 排期 |
+| `docs/alpha/Alpha出口条件.md` | Alpha 出口条件定稿（含口径三次变化与验收汇总） |
+| `docs/alpha/Alpha延展段-D12-D18计划.md` | 延展段任务与评估 |
+| `docs/alpha/测试/` | 冒烟用例表（主体 + 延展段）、测试报告、命中率口径、F3 抽样 |
+
+### Beta 阶段（`docs/beta/`）
+
+| 文档 | 内容 |
+|---|---|
+| `docs/beta/Beta需求卡.md` | 20 张需求卡（用户故事 + 验收 + 降级预案） |
+| `docs/beta/Beta功能说明.md` | 讲给组员的版本：现在什么样 / 怎么做 / 怎么算做完 |
+| `docs/beta/Beta_Issue清单.md` | 51 条子单，按人排（#51–#101） |
+| `docs/beta/契约1.3.0-评审要点.md` | auth 四接口 / readingOrder / 越权 2001 / 划词拦截 |
+| `docs/beta/契约对账-2026-11-18.md` | 契约 vs 实现逐字段对账（#54） |
+| `docs/beta/测试/自查-2026-11-18-用户视角.md` | 用户视角自查 11 条（分级挂 #50） |
+| `docs/beta/issues.json`、`create-issues.ps1` | 建单数据与脚本（可重跑） |
 
 ## 团队
 
-分工细则见 [`docs/团队分工明细.md`](docs/团队分工明细.md)：每人任务包、Issue 编号、责任矩阵、越界红线、接口对接人。
+分工细则见 [`docs/管理/团队分工明细.md`](docs/管理/团队分工明细.md)：每人任务包、Issue 编号、责任矩阵、越界红线、接口对接人。
 
 | 编号 | 姓名 | GitHub | 角色 | Alpha 主责 |
 |---|---|---|---|---|
@@ -99,7 +161,7 @@ feat|fix|docs|test|chore: 简述 (#IssueID)
 | P6 | 刘征 | lzzzzzasd | 数据·部署 | 建表、Redis、一键启动、日志 |
 | P7 | 李义朋 | xingniansky | 测试·文档 | 冒烟用例、Bug List、Scrum 博客 |
 
-详细验收标准见 `docs/三轮功能路线图.md`。
+详细验收标准见 `docs/管理/三轮功能路线图.md`。
 
 ## 国内网络提示
 

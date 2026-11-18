@@ -35,6 +35,7 @@ def search_chunks(paper_id, question, top_k=3):
         with conn.cursor() as cur:
             cur.execute(
                 "select id, chunk_index, page, content, "
+                "bbox_x0, bbox_y0, bbox_x1, bbox_y1, bbox_mode, "
                 "1 - (embedding <=> %s::vector) as similarity "
                 "from chunks where paper_id = %s "
                 "order by embedding <=> %s::vector limit %s",
@@ -49,7 +50,12 @@ def search_chunks(paper_id, question, top_k=3):
             "chunk_index": row[1],
             "page": row[2],
             "content": row[3],
-            "similarity": float(row[4]),
+            "bbox_x0": row[4],
+            "bbox_y0": row[5],
+            "bbox_x1": row[6],
+            "bbox_y1": row[7],
+            "bbox_mode": row[8],
+            "similarity": float(row[9]),
         })
     return results
 
@@ -84,11 +90,12 @@ def _build_citations(chunks, max_citations):
             "page": chunk["page"],
             "snippet": snippet,
             "chunkId": chunk["chunk_id"],
-            # Alpha 阶段 bbox 一律返回 null
-            "bboxX0": None,
-            "bboxY0": None,
-            "bboxX1": None,
-            "bboxY1": None,
+            # #40：返回切片时写入的归一化 bbox 与精度模式；旧数据可为 null
+            "bboxX0": chunk.get("bbox_x0"),
+            "bboxY0": chunk.get("bbox_y0"),
+            "bboxX1": chunk.get("bbox_x1"),
+            "bboxY1": chunk.get("bbox_y1"),
+            "bboxMode": chunk.get("bbox_mode"),
         })
     return citations
 
@@ -104,30 +111,34 @@ def _token_usage(usage):
         "costCny": round(cost, 6),
     }
 
-def _result(answer, citations, start, usage=None):
+def _result(answer, citations, start, usage=None, model=None):
     if usage is None:
         usage = {}
     return {
         "answer": answer,
         "citations": citations,
         "elapsedMs": int((time.time() - start) * 1000),
-        "model": llm_client.model_name(),
+        "model": llm_client.model_name(model),
         "tokenUsage": _token_usage(usage),
     }
 
-def answer_question(paper_id, question, top_k=3, max_citations=3):
-    """完整问答链路。调用前由路由层确认论文存在且已有 chunks。"""
+def answer_question(paper_id, question, top_k=3, max_citations=3,
+                    api_key=None, base_url=None, model=None):
+    """完整问答链路。调用前由路由层确认论文存在且已有 chunks。
+
+    api_key / base_url / model 由前端设置页按次传入；为空时回退到 .env。
+    """
     start = time.time()
 
     chunks = search_chunks(paper_id, question, top_k)
     if len(chunks) == 0:
-        return _result(NO_ANSWER, [], start)
+        return _result(NO_ANSWER, [], start, model=model)
 
     # 仅作兜底下限：bge-m3 的相似度整体偏高（同论文内常见 0.5 左右），
     # “是否真的涉及”主要靠 Prompt 约束，不能只依赖这个阈值。
     min_similarity = float(os.getenv("QA_MIN_SIMILARITY", "0.35"))
     if chunks[0]["similarity"] < min_similarity:
-        return _result(NO_ANSWER, [], start)
+        return _result(NO_ANSWER, [], start, model=model)
 
     remaining = MAX_TOTAL_SECONDS - (time.time() - start)
     if remaining <= 1:
@@ -136,9 +147,17 @@ def answer_question(paper_id, question, top_k=3, max_citations=3):
 
     messages = build_prompt(question, chunks)
     try:
-        answer, usage = llm_client.chat(messages, timeout=min(remaining, llm_client.DEFAULT_TIMEOUT))
+        answer, usage = llm_client.chat(
+            messages,
+            timeout=min(remaining, llm_client.DEFAULT_TIMEOUT),
+            api_key=api_key,
+            base_url=base_url,
+            model=model,
+        )
     except llm_client.LLMTimeout:
         raise QaError("LLM_TIMEOUT", "大模型请求超时")
+    except llm_client.LLMAuthError as e:
+        raise QaError("LLM_AUTH_ERROR", "大模型鉴权失败: " + str(e))
     except Exception as e:
         raise QaError("LLM_ERROR", "大模型调用失败: " + str(e))
 
@@ -148,4 +167,4 @@ def answer_question(paper_id, question, top_k=3, max_citations=3):
     else:
         citations = _build_citations(chunks, max_citations)
 
-    return _result(answer, citations, start, usage)
+    return _result(answer, citations, start, usage, model=model)

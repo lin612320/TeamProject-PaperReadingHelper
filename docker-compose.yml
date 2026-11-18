@@ -29,7 +29,7 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./docs/03-数据库表结构.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./docs/契约/03-数据库表结构.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U papermind -d papermind"]
       interval: 10s
@@ -66,6 +66,10 @@ services:
       SPRING_DATASOURCE_PASSWORD: papermind_dev
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      APP_SEARCH_ARXIV_URL: ${APP_SEARCH_ARXIV_URL:-https://export.arxiv.org/api/query}
+      # 实测：直连 arXiv 一次约 9 秒；原先 10 秒拆两次各 5 秒，必然超时（BUG-021）
+      # 放宽到 30 秒（每次 15 秒），2026-11-18 实测可稳定返回
+      APP_SEARCH_TIMEOUT_SECONDS: ${APP_SEARCH_TIMEOUT_SECONDS:-30}
       AI_SERVICE_URL: http://ai-service:8000
     ports:
       - "8080:8080"
@@ -90,10 +94,16 @@ services:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
       LLM_MODEL: ${LLM_MODEL:-deepseek-chat}
+      # 容器内直连 huggingface.co 会被墙（实测 Errno 101 Network is unreachable），
+      # 模型下载走国内镜像；需要官方源时在 .env 里覆盖 HF_ENDPOINT
+      HF_ENDPOINT: ${HF_ENDPOINT:-https://hf-mirror.com}
     ports:
       - "8000:8000"
     volumes:
       - hf-cache:/root/.cache/huggingface
+      # 与 backend 共用同一个上传卷：P5 要按 backend 传来的路径读 PDF。
+      # 内部契约已写明「docker 里两边必须挂同一个卷」，不挂就报 FILE_NOT_FOUND。
+      - uploads:/app/uploads
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/internal/health', timeout=3).status==200 else 1)\""]
       interval: 15s

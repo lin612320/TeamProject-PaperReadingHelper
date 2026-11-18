@@ -1,0 +1,369 @@
+{
+  "baseUrl": "http://127.0.0.1:8000",
+  "pdf": "ai-service/data/baseline/adaptive-rag/adaptive-rag.pdf",
+  "pdfSha256": "12d262c682626c26a98bdafc7ec5dc6af3fae8247d26d4f2c712b1599dafce62",
+  "gitCommit": "7708fe5",
+  "paperId": 31,
+  "chunkCount": 135,
+  "date": "2026-11-05",
+  "pageCorrect": 5,
+  "total": 10,
+  "pageAccuracy": 0.5,
+  "passedPageAccuracy": false,
+  "note": "内容核对仍需人工完成；pageCorrect 未计入内容错误。",
+  "results": [
+    {
+      "id": "Q1",
+      "question": "论文列出的三点贡献是什么？",
+      "standardPages": [
+        3
+      ],
+      "status": 200,
+      "returnedPages": [],
+      "top1Hit": false,
+      "anyHit": false,
+      "answered": false,
+      "pageCorrect": false,
+      "elapsedMs": 1833,
+      "answer": "本文未涉及该内容",
+      "citations": []
+    },
+    {
+      "id": "Q2",
+      "question": "分类器的三个复杂度标签 A、B、C 分别代表什么？",
+      "standardPages": [
+        5
+      ],
+      "status": 200,
+      "returnedPages": [
+        5,
+        5,
+        5
+      ],
+      "top1Hit": true,
+      "anyHit": true,
+      "answered": true,
+      "pageCorrect": true,
+      "elapsedMs": 2197,
+      "answer": "根据原文，三个复杂度标签的含义是：\n\n- **‘A’**：表示查询 q 是简单的（straight-...，原文此处被截断），对应最简单的非检索方法即可正确生成答案的查询。\n- **‘B’**：当单步和多步方法都产生相同正确答案而非检索方法失败时，赋予标签‘B’；此外，第一轮标注后仍未标注的查询中，单跳数据集（single-hop datasets）的查询也赋予‘B’。\n- **‘C’**：第一轮标注后仍未标注的查询中，多跳数据集（multi-hop datasets）的查询赋予‘C’。",
+      "citations": [
+        {
+          "page": 5,
+          "snippet": "y of the query, which is one of\n{‘A’, ‘B’, ‘C’}, by forwarding it to Classifier:\n\no = Classifier(q).\n\nQuery Complexity Assessment\nTo operational-\nize our adaptive retrieval-augmented LLM frame-\nwork, ",
+          "chunkId": 1434,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 5,
+          "snippet": "complexity based on the results from three different\nretrieval-augmented LLM strategies, in order to\ndetermine the label by its needs. For example, if\nthe simplest non-retrieval-based approach correct",
+          "chunkId": 1429,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 5,
+          "snippet": "tep approach). Therefore, for those queries\nthat remain unlabeled after the first labeling step,\nwe \n\nassign ‘B’ to queries in single-hop datasets\nand ‘C’ to queries in multi-hop datasets. Finally,\nwe",
+          "chunkId": 1433,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        }
+      ]
+    },
+    {
+      "id": "Q3",
+      "question": "分类器的训练标签是如何自动构造的？",
+      "standardPages": [
+        5
+      ],
+      "status": 200,
+      "returnedPages": [
+        5,
+        9,
+        5
+      ],
+      "top1Hit": true,
+      "anyHit": true,
+      "answered": true,
+      "pageCorrect": true,
+      "elapsedMs": 2011,
+      "answer": "根据原文，分类器的训练标签自动构造方式为：对于第一步标注后仍未标注的查询，单跳数据集中的查询赋为‘B’，多跳数据集中的查询赋为‘C’；然后用这些自动收集的查询-复杂度对，通过交叉熵损失训练分类器。",
+      "citations": [
+        {
+          "page": 5,
+          "snippet": "els of query complexity, and leave\nthe exploration of more fine-grained complexities as future\nwork.\n\n3As we automatically assign classifier labels, there might\nbe errors in labeling and might be more",
+          "chunkId": 1437,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 9,
+          "snippet": "ated from the predicted outcomes and the inductive\nbiases in datasets. We validated our Adaptive-RAG\n\nin effectiveness and efficiency by determining the\nquery complexity and then leveraging the most\ns",
+          "chunkId": 1474,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 5,
+          "snippet": "tep approach). Therefore, for those queries\nthat remain unlabeled after the first labeling step,\nwe \n\nassign ‘B’ to queries in single-hop datasets\nand ‘C’ to queries in multi-hop datasets. Finally,\nwe",
+          "chunkId": 1433,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        }
+      ]
+    },
+    {
+      "id": "Q4",
+      "question": "用来预测查询复杂度的分类器是什么模型？",
+      "standardPages": [
+        6
+      ],
+      "status": 200,
+      "returnedPages": [
+        5,
+        2,
+        7
+      ],
+      "top1Hit": false,
+      "anyHit": false,
+      "answered": true,
+      "pageCorrect": false,
+      "elapsedMs": 1546,
+      "answer": "原文提到该分类器是一个较小的语言模型（a smaller Language Model），被训练用于将查询分类为三个复杂度等级之一。",
+      "citations": [
+        {
+          "page": 5,
+          "snippet": "y of the query, which is one of\n{‘A’, ‘B’, ‘C’}, by forwarding it to Classifier:\n\no = Classifier(q).\n\nQuery Complexity Assessment\nTo operational-\nize our adaptive retrieval-augmented LLM frame-\nwork, ",
+          "chunkId": 1434,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 2,
+          "snippet": "iple\ntimes (Press et al., 2023; Trivedi et al., 2023), at\nthe cost of heavy computational overheads.\n\nIn this work, considering diverse complexity lev-\nels of real-world queries, we argue that previou",
+          "chunkId": 1403,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 7,
+          "snippet": "0.03\n0.31\n0.65\n0.2\n\nNo\nOne\nMulti\n\nF1\n10\n\nClassifier Acc.\n35\n\nF1\n10\n\nClassifier Acc.\n35\n\nNo\nOne\nMulti\n\nFigure 3: Performance on QA and query-complexity assessment of different adaptive approaches for r",
+          "chunkId": 1451,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        }
+      ]
+    },
+    {
+      "id": "Q5",
+      "question": "实验使用了哪些单跳（single-hop）数据集？",
+      "standardPages": [
+        6,
+        14
+      ],
+      "status": 200,
+      "returnedPages": [],
+      "top1Hit": false,
+      "anyHit": false,
+      "answered": false,
+      "pageCorrect": false,
+      "elapsedMs": 1733,
+      "answer": "原文提到“For simpler queries, we use three benchmark single-hop QA datasets”，但未列出这三个数据集的名称；片段3表格中出现的 SQuAD、Natural Questions、TriviaQA 未在原文中明确标注为单跳数据集。因此，本文未涉及该内容",
+      "citations": []
+    },
+    {
+      "id": "Q6",
+      "question": "所有模型统一使用的检索器是什么？属于稀疏还是稠密检索？",
+      "standardPages": [
+        6
+      ],
+      "status": 200,
+      "returnedPages": [
+        6,
+        9,
+        2
+      ],
+      "top1Hit": true,
+      "anyHit": true,
+      "answered": true,
+      "pageCorrect": true,
+      "elapsedMs": 1937,
+      "answer": "所有模型统一使用的检索器是BM25，属于基于词的稀疏检索模型。",
+      "citations": [
+        {
+          "page": 6,
+          "snippet": "s\n\nWhen it comes to evaluating adaptive models, it\n\nis essential to simultaneously consider both the\n\nFor a fair comparison and following Mallen et al.\n(2023) and Trivedi et al. (2023), we use the sam",
+          "chunkId": 1445,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 9,
+          "snippet": "with varying model sizes for classifiers.\n\nQA\nClassifier (Accuracy)\n\nSizes\nF1\nStep\nAll\nNo\nOne\nMulti\n\nSmall (60M)\n45.83\n964\n53.48 26.65 70.62 53.18\nBase (223M)\n45.97\n983\n53.41 26.42 69.46 56.82\nLarge (",
+          "chunkId": 1470,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 2,
+          "snippet": "iple\ntimes (Press et al., 2023; Trivedi et al., 2023), at\nthe cost of heavy computational overheads.\n\nIn this work, considering diverse complexity lev-\nels of real-world queries, we argue that previou",
+          "chunkId": 1403,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        }
+      ]
+    },
+    {
+      "id": "Q7",
+      "question": "在实现细节（Implementation Details）中，生成答案使用了哪些大模型？",
+      "standardPages": [
+        6
+      ],
+      "status": 200,
+      "returnedPages": [],
+      "top1Hit": false,
+      "anyHit": false,
+      "answered": false,
+      "pageCorrect": false,
+      "elapsedMs": 1353,
+      "answer": "原文提到使用了XXL（11B参数）和GPT-3.5模型（gpt-3.5-turbo-instruct），但未明确说明这些模型是用于生成答案的。本文未涉及该内容",
+      "citations": []
+    },
+    {
+      "id": "Q8",
+      "question": "与多步（multi-step）方法相比，论文如何描述 Adaptive-RAG 的效率？",
+      "standardPages": [
+        7
+      ],
+      "status": 200,
+      "returnedPages": [
+        7,
+        1,
+        9
+      ],
+      "top1Hit": true,
+      "anyHit": true,
+      "answered": true,
+      "pageCorrect": true,
+      "elapsedMs": 2151,
+      "answer": "原文提到，与复杂的多步策略相比，所提出的自适应策略在所有模型规模上都显著更高效。",
+      "citations": [
+        {
+          "page": 7,
+          "snippet": "also efficiency. As shown in Table 1, compared to\nthe complex multi-step strategy, our proposed ada\n\np-\ntive strategy is significantly more efficient across\nall model sizes. This is meaningful in this",
+          "chunkId": 1455,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 1,
+          "snippet": "Adaptive-RAG: Learning to Adapt Retrieval-Augmented\n\nLarge Language Models through Question Complexity\n\nSoyeong Jeong1\nJinheon Baek2\nSukmin Cho1\nSung Ju Hwang1,2\nJong C. Park1*\nSchool of Computing1\nGr",
+          "chunkId": 1391,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 9,
+          "snippet": "ls to request such information from\nexternal sources, resulting in inaccurate answers.\n\n6\nConclusion\n\nIn this work, we proposed the Adaptive Retrieval-\nAugmented Generation framework, referred to\nas A",
+          "chunkId": 1472,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        }
+      ]
+    },
+    {
+      "id": "Q9",
+      "question": "表 3 中，标签 A、B、C 对应的每查询精确耗时分别是多少？",
+      "standardPages": [
+        8
+      ],
+      "status": 200,
+      "returnedPages": [
+        8,
+        8,
+        7
+      ],
+      "top1Hit": true,
+      "anyHit": true,
+      "answered": true,
+      "pageCorrect": true,
+      "elapsedMs": 1692,
+      "answer": "表 3 中标签 A、B、C 对应的每查询精确耗时分别是 0.35 秒、3.08 秒、27.18 秒。",
+      "citations": [
+        {
+          "page": 8,
+          "snippet": "urce-efficient set-\ntings in real-use cases with smaller sizes without\ncompromising the performance.\n\nAnalyses on Efficiency for Classifier\nWhile Ta-\nble 1 shows the relative elapsed time for each of ",
+          "chunkId": 1464,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 8,
+          "snippet": "Table 3: The exact elapsed time per query and the percentage\nof the predicted labels from the classifier over all samples.\n\nTable 4: Results on QA and complexity classification with\nvarying the data a",
+          "chunkId": 1457,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        },
+        {
+          "page": 7,
+          "snippet": "39.30\n34.00\n1.00\n1.00\n37.80\n47.30\n44.60\n1.00\n1.00\n53.60\n62.40\n60.20\n1.00\n1.00\n\nSingle-step\n\nAdaptive\n\nAdaptive Retrieval\n13.40\n23.10\n17.60\n0.50\n0.55\n28.20\n36.00\n33.00\n0.50\n0.56\n38.40\n46.90\n42.60\n0.50\n",
+          "chunkId": 1448,
+          "bboxX0": null,
+          "bboxY0": null,
+          "bboxX1": null,
+          "bboxY1": null
+        }
+      ]
+    },
+    {
+      "id": "Q10",
+      "question": "论文在 Limitations 中指出的主要问题或未来工作是什么？",
+      "standardPages": [
+        9
+      ],
+      "status": 200,
+      "returnedPages": [],
+      "top1Hit": false,
+      "anyHit": false,
+      "answered": false,
+      "pageCorrect": false,
+      "elapsedMs": 2770,
+      "answer": "本文未涉及该内容",
+      "citations": []
+    }
+  ]
+}

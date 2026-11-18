@@ -81,6 +81,10 @@ public class QaController {
         req.put("topK", 3);
         req.put("maxCitations", 3);
 
+        putIfPresent(req, "apiKey", body.get("apiKey"));
+        putIfPresent(req, "baseUrl", body.get("baseUrl"));
+        putIfPresent(req, "model", body.get("model"));
+
         Map<?, ?> aiResp = callAiService(req, paperId);
 
         Object tokenUsage = aiResp.get("tokenUsage");
@@ -94,6 +98,16 @@ public class QaController {
         data.put("elapsedMs", aiResp.get("elapsedMs"));
         data.put("model", aiResp.get("model"));
         return ApiResponse.ok(data);
+    }
+
+    private void putIfPresent(Map<String, Object> req, String key, Object value) {
+        if (value == null) {
+            return;
+        }
+        String s = String.valueOf(value).trim();
+        if (!s.isEmpty()) {
+            req.put(key, s);
+        }
     }
 
     private Map<?, ?> callAiService(Map<String, Object> req, long paperId) {
@@ -122,12 +136,12 @@ public class QaController {
                 aiResp = new com.fasterxml.jackson.databind.ObjectMapper()
                     .readValue(response.body(), Map.class);
             } catch (Exception ignored) {
-                // 响应不是 JSON，下面按状态码处理
             }
 
             if (response.statusCode() != 200) {
-                log.error("ai qa failed, paperId={} status={} body={}",
-                    paperId, response.statusCode(), response.body());
+                Object code = aiResp == null ? null : aiResp.get("code");
+                log.error("ai qa failed, paperId={} status={} code={}",
+                    paperId, response.statusCode(), code);
                 throw new BizException(mapError(aiResp, response.statusCode()));
             }
 
@@ -163,7 +177,12 @@ public class QaController {
         if ("LLM_TIMEOUT".equals(code)) {
             return ErrorCode.AI_SERVICE_TIMEOUT;
         }
+        if ("LLM_AUTH_ERROR".equals(code)) {
+            return ErrorCode.AI_SERVICE_AUTH_ERROR;
+        }
 
+        if (status == 401) return ErrorCode.AI_SERVICE_AUTH_ERROR;
+        if (status == 403) return ErrorCode.AI_SERVICE_AUTH_ERROR;
         if (status == 404) return ErrorCode.PAPER_NOT_FOUND;
         if (status == 409) return ErrorCode.PAPER_NOT_READY;
         if (status == 422) return ErrorCode.EMPTY_QUESTION;

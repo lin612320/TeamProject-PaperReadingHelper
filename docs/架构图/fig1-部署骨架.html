@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>PaperMind 部署骨架</title>
+<style>
+  html,body{margin:0;padding:0;background:#fff;}
+  svg{display:block;}
+  text{font-family:"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif;}
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" width="1700" height="1090" viewBox="0 0 1700 1090">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/>
+    </marker>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1700" height="1090" fill="#ffffff"/>
+
+  <!-- 标题 -->
+  <text x="44" y="52" font-size="27" font-weight="700" fill="#0f172a">PaperMind · Alpha 部署骨架（五容器 / 四数据卷）</text>
+  <text x="44" y="82" font-size="14.5" fill="#64748b">一条 docker compose up -d 起全栈 · 对外只有前端 8081 一个入口 · 后端 8080 · AI 服务 8000（仅内部可调）</text>
+
+  <!-- 层次标签 -->
+  <text x="44" y="158" font-size="13.5" fill="#94a3b8">① 客户端</text>
+  <text x="44" y="288" font-size="13.5" fill="#94a3b8">② 接入层</text>
+  <text x="44" y="438" font-size="13.5" fill="#94a3b8">③ 业务层</text>
+  <text x="44" y="648" font-size="13.5" fill="#94a3b8">④ 数据层</text>
+  <text x="1120" y="362" font-size="13.5" fill="#94a3b8">⑤ 外部依赖</text>
+
+  <!-- ① 浏览器 -->
+  <rect x="200" y="110" width="340" height="88" rx="12" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+  <text x="220" y="146" font-size="16.5" font-weight="700" fill="#1e3a8a">浏览器</text>
+  <text x="220" y="172" font-size="12.5" fill="#475569">Vue 3 · Element Plus · pdf.js 6.4</text>
+
+  <!-- ② 前端 nginx -->
+  <rect x="200" y="240" width="340" height="88" rx="12" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+  <text x="220" y="276" font-size="16.5" font-weight="700" fill="#1e3a8a">frontend（nginx）:8081</text>
+  <text x="220" y="302" font-size="12.5" fill="#475569">唯一对外入口 · 反代 /api/** → backend</text>
+
+  <!-- ③ backend -->
+  <rect x="200" y="380" width="300" height="110" rx="12" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+  <text x="220" y="412" font-size="16.5" font-weight="700" fill="#065f46">backend（Spring Boot）:8080</text>
+  <text x="220" y="438" font-size="12.5" fill="#475569">上传 / 文献 CRUD / 转发问答</text>
+  <text x="220" y="460" font-size="12.5" fill="#475569">转发检索与导入 · 不管向量与 Prompt</text>
+  <text x="220" y="482" font-size="12.5" fill="#475569">统一 ApiResponse + 错误码</text>
+
+  <!-- ③ ai-service -->
+  <rect x="560" y="380" width="300" height="110" rx="12" fill="#fffbeb" stroke="#f59e0b" stroke-width="2"/>
+  <text x="580" y="412" font-size="16.5" font-weight="700" fill="#92400e">ai-service（FastAPI）:8000</text>
+  <text x="580" y="438" font-size="12.5" fill="#475569">PyMuPDF 抽取 · 切片 · bge-m3</text>
+  <text x="580" y="460" font-size="12.5" fill="#475569">pgvector 检索 · Prompt · LLM 调用</text>
+  <text x="580" y="482" font-size="12.5" fill="#475569">只被 backend 调用，不对外暴露</text>
+
+  <!-- ④ postgres -->
+  <rect x="200" y="595" width="300" height="95" rx="12" fill="#f8fafc" stroke="#64748b" stroke-width="2"/>
+  <text x="220" y="627" font-size="16.5" font-weight="700" fill="#1e293b">postgres 16 + pgvector :5432</text>
+  <text x="220" y="653" font-size="12.5" fill="#475569">papers / chunks / reading_session</text>
+  <text x="220" y="675" font-size="12.5" fill="#475569">annotation · chunks.embedding vector(1024)</text>
+
+  <!-- ④ redis -->
+  <rect x="560" y="595" width="300" height="95" rx="12" fill="#f8fafc" stroke="#64748b" stroke-width="2"/>
+  <text x="580" y="627" font-size="16.5" font-weight="700" fill="#1e293b">redis 7 :6379</text>
+  <text x="580" y="653" font-size="12.5" fill="#475569">检索缓存 TTL 24h</text>
+  <text x="580" y="675" font-size="12.5" fill="#475569">key = 来源 + 关键词哈希 + 分页</text>
+
+  <!-- ⑤ 外部 -->
+  <rect x="1120" y="380" width="460" height="95" rx="12" fill="#fdf2f8" stroke="#db2777" stroke-width="2"/>
+  <text x="1140" y="412" font-size="16.5" font-weight="700" fill="#9d174d">DeepSeek API（OpenAI 兼容）</text>
+  <text x="1140" y="438" font-size="12.5" fill="#475569">POST /chat/completions · temperature=0</text>
+  <text x="1140" y="460" font-size="12.5" fill="#475569">stream=false · 默认 20s 超时</text>
+
+  <rect x="1120" y="495" width="460" height="80" rx="12" fill="#fdf2f8" stroke="#db2777" stroke-width="2"/>
+  <text x="1140" y="527" font-size="16.5" font-weight="700" fill="#9d174d">arXiv API</text>
+  <text x="1140" y="553" font-size="12.5" fill="#475569">export.arxiv.org · Atom XML · 10s 拆两次各 5s</text>
+
+  <rect x="1120" y="595" width="460" height="80" rx="12" fill="#fdf2f8" stroke="#db2777" stroke-width="2"/>
+  <text x="1140" y="627" font-size="16.5" font-weight="700" fill="#9d174d">OpenAlex API</text>
+  <text x="1140" y="653" font-size="12.5" fill="#475569">api.openalex.org · JSON · 第二来源</text>
+
+  <!-- 连线 -->
+  <!-- 浏览器 → frontend -->
+  <line x1="370" y1="198" x2="370" y2="238" stroke="#475569" stroke-width="2" marker-end="url(#arw)"/>
+  <text x="382" y="224" font-size="11.5" fill="#334155">HTTP :8081</text>
+
+  <!-- frontend → backend -->
+  <line x1="370" y1="328" x2="370" y2="378" stroke="#475569" stroke-width="2" marker-end="url(#arw)"/>
+  <text x="382" y="362" font-size="11.5" fill="#334155">反代 /api</text>
+
+  <!-- backend → ai-service -->
+  <line x1="500" y1="430" x2="556" y2="430" stroke="#475569" stroke-width="2" marker-end="url(#arw)"/>
+  <text x="505" y="422" font-size="11" fill="#334155">内部</text>
+  <text x="505" y="452" font-size="11" fill="#334155">契约</text>
+
+  <!-- backend → postgres -->
+  <line x1="350" y1="490" x2="350" y2="593" stroke="#475569" stroke-width="2" marker-end="url(#arw)"/>
+  <text x="360" y="546" font-size="11.5" fill="#334155">JDBC</text>
+
+  <!-- backend → redis -->
+  <path d="M450,490 V552 H700 V593" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arw)"/>
+  <text x="596" y="546" font-size="11.5" fill="#334155">缓存读写</text>
+
+  <!-- ai-service → postgres -->
+  <path d="M600,490 V574 H404 V593" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arw)"/>
+  <text x="430" y="568" font-size="11.5" fill="#334155">psycopg 写 chunks</text>
+
+  <!-- ai-service → DeepSeek -->
+  <line x1="860" y1="428" x2="1116" y2="428" stroke="#475569" stroke-width="2" marker-end="url(#arw)"/>
+  <text x="898" y="420" font-size="11.5" fill="#334155">LLM 调用</text>
+
+  <!-- backend → arXiv（上方走廊） -->
+  <path d="M500,400 V345 H1046 V535 H1114" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arw)"/>
+  <text x="700" y="338" font-size="11.5" fill="#334155">检索元数据（XML）</text>
+
+  <!-- backend → OpenAlex（更上方走廊） -->
+  <path d="M540,380 V318 H1080 V635 H1114" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arw)"/>
+  <text x="700" y="311" font-size="11.5" fill="#334155">检索元数据（JSON）</text>
+
+  <!-- 数据卷带 -->
+  <rect x="60" y="718" width="1580" height="132" rx="14" fill="#f8fafc" stroke="#94a3b8" stroke-width="2" stroke-dasharray="8 6"/>
+  <text x="80" y="746" font-size="15" font-weight="700" fill="#334155">数据卷（docker volume）—— 删卷就是丢数据，禁止 docker compose down -v</text>
+
+  <rect x="100" y="762" width="330" height="68" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.6"/>
+  <text x="118" y="788" font-size="13.5" font-weight="700" fill="#1e293b">pgdata → postgres</text>
+  <text x="118" y="812" font-size="11.5" fill="#64748b">库文件；删了要重新上传所有论文</text>
+
+  <rect x="452" y="762" width="330" height="68" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.6"/>
+  <text x="470" y="788" font-size="13.5" font-weight="700" fill="#1e293b">redis-data → redis</text>
+  <text x="470" y="812" font-size="11.5" fill="#64748b">检索缓存；删了只是缓存失效</text>
+
+  <rect x="804" y="762" width="380" height="68" rx="10" fill="#fef2f2" stroke="#dc2626" stroke-width="2"/>
+  <text x="822" y="788" font-size="13.5" font-weight="700" fill="#991b1b">uploads → backend ＋ ai-service（共享）</text>
+  <text x="822" y="812" font-size="11.5" fill="#b91c1c">不共享就 FILE_NOT_FOUND：Java 存盘，Python 按路径读</text>
+
+  <rect x="1206" y="762" width="384" height="68" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.6"/>
+  <text x="1224" y="788" font-size="13.5" font-weight="700" fill="#1e293b">hf-cache → ai-service</text>
+  <text x="1224" y="812" font-size="11.5" fill="#64748b">bge-m3 约 2.2GB；删了要联网重下</text>
+
+  <!-- 说明面板 -->
+  <rect x="60" y="872" width="1580" height="196" rx="14" fill="#fffbeb" stroke="#f59e0b" stroke-width="1.6"/>
+  <text x="80" y="902" font-size="15" font-weight="700" fill="#92400e">叙述要点（五个坑，讲骨架时顺手带出来）</text>
+
+  <text x="80" y="934" font-size="13" fill="#334155">1. frontend 用 nginx 同时管静态资源与 /api 反代，所以浏览器只认 8081 一个端口；5173 是 Vite 开发态，行为与交付形态不同。</text>
+  <text x="80" y="964" font-size="13" fill="#334155">2. backend 与 ai-service 的 HTTP 客户端都显式写死 HTTP/1.1：JDK 默认会尝试 h2c 升级，uvicorn 不支持，请求体会在协商里丢掉。</text>
+  <text x="80" y="994" font-size="13" fill="#334155">3. backend 与 ai-service 必须挂同一个 uploads 卷：Java 落盘后把容器内路径交给 Python 读，路径不在同一卷上就读不到。</text>
+  <text x="80" y="1024" font-size="13" fill="#334155">4. ai-service 不对外暴露，只被 backend 调用；前端永远只认 8081，不存在“浏览器直接打 8000”这条路。</text>
+  <text x="80" y="1054" font-size="13" fill="#334155">5. postgres 两边都用：backend 管 papers，ai-service 管 chunks；redis 只有 backend 用（检索缓存）。</text>
+</svg>
+</body>
+</html>
