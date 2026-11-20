@@ -38,6 +38,37 @@ function formatApiError(error, response, result) {
   return new Error('操作失败，请稍后重试')
 }
 
+// 扫描件（无文字层）的标识：后端 ai-service 抛 NOT_PDF + 该文案，
+// 经 ParseService 包装后出现在 parse_error 里。
+const NO_TEXT_LAYER_MARKERS = ['PDF 中没有可用的文字', '没有可用的文字']
+
+// 把后端 parse_error 翻译成用户能看懂的中文提示，
+// 并对扫描件（无文字层）给出明确说明 + 下一步建议。
+// 返回 { kind, title, suggestion }：
+//   kind = 'no-text-layer'  扫描件，需 OCR（本轮范围外）
+//   kind = 'other'          其他可读失败原因（原样展示）
+//   kind = 'unknown'        无详情或不可读，给通用提示
+export function getParseFailureInfo(parseError) {
+  const text = typeof parseError === 'string' ? parseError.trim() : ''
+
+  if (text && NO_TEXT_LAYER_MARKERS.some((marker) => text.includes(marker))) {
+    return {
+      kind: 'no-text-layer',
+      title: '该 PDF 无文字层，暂不支持，需 OCR',
+      suggestion: '请换用带文字层的 PDF 后重新上传。',
+    }
+  }
+
+  // 其余失败：后端已针对超时/连不上等写了可读中文原因，
+  // 但 NOT_PDF 等被包成「AI 服务返回 N：{...}」时不可读，退回通用提示。
+  const readable = text && !text.includes('AI 服务返回')
+  return {
+    kind: readable ? 'other' : 'unknown',
+    title: readable ? text : '解析未成功，请稍后刷新查看。',
+    suggestion: readable ? '请稍后刷新重试。' : '',
+  }
+}
+
 // 统一处理后端返回结果
 async function request(url) {
   let response

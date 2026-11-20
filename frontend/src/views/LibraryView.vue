@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { getPapers, getPaper } from '../api/papers'
+import { getPapers, getPaper, getParseFailureInfo } from '../api/papers'
 
 const papers = ref([])
 const total = ref(0)
@@ -40,6 +40,43 @@ function statusText(status) {
   return statusMap[status] || '状态未知'
 }
 
+// 将后端 parseError 翻译成卡片上展示的失败提示
+function failureInfo(paper) {
+  return getParseFailureInfo(paper?.parseError)
+}
+
+// 列表接口不返回 parseError，已失败的文献需补查详情，
+// 才能在卡片上展示「无文字层 / 超时」等具体原因（含刷新页面后的旧失败记录）。
+async function hydrateFailedPapers() {
+  const targets = papers.value.filter(
+    (paper) => paper.parseStatus === 'failed' && !paper.parseError
+  )
+
+  if (targets.length === 0) return
+
+  await Promise.all(
+    targets.map(async (paper) => {
+      try {
+        const detail = await getPaper(paper.id)
+
+        const index = papers.value.findIndex(
+          (item) => item.id === paper.id
+        )
+
+        if (index !== -1) {
+          papers.value[index] = {
+            ...papers.value[index],
+            ...detail,
+          }
+        }
+      } catch (error) {
+        // 单篇查询失败不影响列表展示，保留原状态即可
+        console.warn(`文献 ${paper.id} 的失败原因查询失败`, error)
+      }
+    })
+  )
+}
+
 // 加载文献列表
 async function loadPapers(showLoading = true) {
   if (requestInProgress) return
@@ -54,6 +91,7 @@ async function loadPapers(showLoading = true) {
     const result = await getPapers(1, 20)
     papers.value = result.items
     total.value = result.total
+    await hydrateFailedPapers()
   } catch (error) {
     errorMessage.value =
       error.message || '文献列表加载失败，请稍后重试'
@@ -223,9 +261,14 @@ onUnmounted(() => {
             {{ statusText(paper.parseStatus) }}
           </div>
 
-          <p v-if="paper.parseStatus === 'failed'" class="hint">
-            解析未成功，请稍后刷新查看。
-          </p>
+          <template v-if="paper.parseStatus === 'failed'">
+            <p class="hint hint-title">
+              {{ failureInfo(paper).title }}
+            </p>
+            <p v-if="failureInfo(paper).suggestion" class="hint hint-suggestion">
+              {{ failureInfo(paper).suggestion }}
+            </p>
+          </template>
           <p v-else-if="paper.parseStatus !== 'ready'" class="hint">
             解析完成后即可进入阅读器。
           </p>
@@ -419,6 +462,15 @@ h1 {
   margin: 8px 0 0;
   color: #64748b;
   font-size: 12px;
+}
+
+.hint-title {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.hint-suggestion {
+  color: #b45309;
 }
 
 .open-arrow {

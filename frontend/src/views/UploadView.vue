@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { uploadPaper } from '../api/papers'
+import { uploadPaper, getParseFailureInfo } from '../api/papers'
 
 const router = useRouter()
 
@@ -90,7 +90,12 @@ async function handleUpload() {
     })
     router.push('/library')
   } catch (error) {
-    errorMessage.value = error.message || '上传失败，请稍后重试。'
+    const info = getParseFailureInfo(error?.message)
+    if (info.kind === 'no-text-layer') {
+      errorMessage.value = `${info.title}；${info.suggestion}`
+    } else {
+      errorMessage.value = error.message || '上传失败，请稍后重试。'
+    }
   } finally {
     uploading.value = false
   }
