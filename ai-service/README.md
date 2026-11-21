@@ -189,8 +189,11 @@ $env:HF_ENDPOINT="https://hf-mirror.com"          # Windows PowerShell
 .venv/Scripts/python.exe -m scripts.check_rag "D:/pdfs/test.pdf"
 .venv/Scripts/python.exe -m scripts.check_qa "D:/pdfs/test.pdf"
 .venv/Scripts/python.exe -m scripts.eval_qa --label round1
+.venv/Scripts/python.exe -m scripts.check_layout
+.venv/Scripts/python.exe -m scripts.check_layout --pdf "D:/pdfs/two-column.pdf"
 ```
 
+- `check_layout` 验证 #79 切带 / #80 栏缝检测：默认跑合成页（不依赖 `data/`，可进 CI）；`--pdf` 附加真实 PDF 的逐页诊断。
 - `check_rag` 直接调用服务层，验证「检索 → Prompt → 返回结构」；未配置 `DEEPSEEK_API_KEY` 时自动使用 mock 模型，不消耗额度。
 - `check_qa` 通过 HTTP 调用 `/internal/qa/ask`，验证 200 响应结构与 404/409/422 错误分支，**需要先启动 uvicorn**。
 - `eval_qa` 按 `docs/alpha/测试/F3抽样题库.md` 批量评估 10 题，校验 PDF SHA256，结果写入 `docs/测试/`；**需要先启动 uvicorn**。

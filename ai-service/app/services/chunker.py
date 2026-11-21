@@ -21,6 +21,16 @@ COLUMN_MIN_BLOCK_WIDTH = 0.15  # 排除侧边水印/页码等窄块
 COLUMN_MIN_SPAN = 0.5          # 两栏合起来至少跨页高 50%
 DOC_DOUBLE_COLUMN_RATIO = 0.5  # 双栏页占正文页一半以上，判整篇双栏
 
+# 版面带 / 栏缝参数（#79 #80）
+FULL_WIDTH_RATIO = 0.75        # 宽度 > 页宽 75% 的块视为通栏块
+NARROW_MAX_WIDTH = 0.55        # 第一遍找候选栏缝时，只信宽度不超过该值的块
+GUTTER_SEARCH_MIN = 0.35       # 栏缝搜索区间
+GUTTER_SEARCH_MAX = 0.65
+GUTTER_STEP = 0.01
+GUTTER_MAX_COVERAGE = 1        # 允许跨栏缝的块数（标题/表头偶尔跨过）
+GUTTER_MAX_CROSS_SPAN = 0.35   # 跨缝块最多占页高多少；超过说明是通栏表格，不是栏缝
+GUTTER_MIN_SIDE_BLOCKS = 2     # 栏缝左右各至少几个块才认
+
 
 def _block_bbox(block):
     """取 block 的归一化 bbox；字段缺失或非法时返回 None。"""
@@ -108,6 +118,423 @@ def _is_double_column(blocks):
     overlap = max(left_y0, right_y0) < min(left_y1, right_y1)
     span = max(left_y1, right_y1) - min(left_y0, right_y0)
     return overlap and span >= COLUMN_MIN_SPAN
+
+
+# ────────────────────────────────────────────────────────────
+# #79 / #80：版面带与栏缝
+#   这些函数只产出“版面判定”，不改 build_chunks 的切片结果；
+#   真正按 band/column 重排、写 reading_order 是 #81。
+# ────────────────────────────────────────────────────────────
+
+def _block_width(block):
+    """返回归一化宽度；bbox 非法时返回 None。"""
+    bbox = _block_bbox(block)
+    if bbox is None:
+        return None
+    return bbox[2] - bbox[0]
+
+
+def _is_full_width_block(block):
+    """宽度超过页宽 75% 的块：通栏标题、通栏图注、通栏表格等。
+
+    注意：这是几何判定，不是语义分类。它只说明这个块横跨了
+    大部分页宽、不能完整放进某一栏，并不保证它一定是标题/图/表。
+    """
+    width = _block_width(block)
+    return width is not None and width > FULL_WIDTH_RATIO
+
+
+def _crosses(block, x):
+    """块是否横跨给定的 x（x 落在块的左右边界之间）。"""
+    bbox = _block_bbox(block)
+    return bbox is not None and bbox[0] < x < bbox[2]
+
+
+def _has_valid_bbox(blocks):
+    """这一组块里是否至少有一个可用 bbox。"""
+    for block in blocks:
+        if _block_bbox(block) is not None:
+            return True
+    return False
+
+
+def _is_layout_block(block):
+    """宽度达到一个栏内文字块的最小宽度，排除图表里的碎词。"""
+    width = _block_width(block)
+    return width is not None and width >= COLUMN_MIN_BLOCK_WIDTH
+
+
+def _is_meaningful_block(block):
+    """够长、够宽的有效正文块；用于栏缝证据，避免表头/图表碎词干扰。"""
+    if not _is_layout_block(block):
+        return False
+    return len(block.get("text") or "") >= COLUMN_MIN_BLOCK_CHARS
+
+
+def _band_bounds(blocks):
+    """返回 band 的纵向范围 (min y0, max y1)；没有有效 bbox 时返回 (None, None)。"""
+    y0 = None
+    y1 = None
+    for block in blocks:
+        bbox = _block_bbox(block)
+        if bbox is None:
+            continue
+        if y0 is None or bbox[1] < y0:
+            y0 = bbox[1]
+        if y1 is None or bbox[3] > y1:
+            y1 = bbox[3]
+    return y0, y1
+
+
+def _runs(xs, counts, value):
+    """把 counts 中连续等于 value 的点合并成区间。
+
+    返回 [(start_x, end_x), ...]，按 x 从左到右。
+    """
+    runs = []
+    start = None
+    for i, count in enumerate(counts):
+        if count == value:
+            if start is None:
+                start = i
+        else:
+            if start is not None:
+                runs.append((xs[start], xs[i - 1]))
+                start = None
+    if start is not None:
+        runs.append((xs[start], xs[-1]))
+    return runs
+
+
+def _run_midpoint(run):
+    """取区间的中点，保留两位小数。"""
+    return round((run[0] + run[1]) / 2.0, 2)
+
+
+def _widest_run(runs):
+    """取最宽的区间；同宽时取离 0.5 最近的，保证结果确定。"""
+    best = None
+    for run in runs:
+        if best is None:
+            best = run
+            continue
+        width = run[1] - run[0]
+        best_width = best[1] - best[0]
+        if width > best_width + 1e-9:
+            best = run
+        elif abs(width - best_width) <= 1e-9:
+            if abs(_run_midpoint(run) - 0.5) < abs(_run_midpoint(best) - 0.5):
+                best = run
+    return best
+
+
+def _gutter_profile(blocks):
+    """把块的 [x0, x1] 投影到 0.35–0.65 的横轴上，统计覆盖次数。
+
+    返回:
+        {
+            "xs": [...], "counts": [...],
+            "min_count": int, "min_xs": [...],
+            "zero_runs": [(start, end), ...],
+            "min_runs": [(start, end), ...],
+        }
+    """
+    xs = []
+    counts = []
+    steps = int(round((GUTTER_SEARCH_MAX - GUTTER_SEARCH_MIN) / GUTTER_STEP))
+
+    for i in range(steps + 1):
+        x = round(GUTTER_SEARCH_MIN + i * GUTTER_STEP, 4)
+        count = 0
+        for block in blocks:
+            bbox = _block_bbox(block)
+            if bbox is not None and bbox[0] < x < bbox[2]:
+                count += 1
+        xs.append(x)
+        counts.append(count)
+
+    min_count = min(counts) if counts else 0
+    min_xs = [xs[i] for i, count in enumerate(counts) if count == min_count]
+
+    return {
+        "xs": xs,
+        "counts": counts,
+        "min_count": min_count,
+        "min_xs": min_xs,
+        "zero_runs": _runs(xs, counts, 0),
+        "min_runs": _runs(xs, counts, min_count),
+    }
+
+
+def _side_counts(blocks, x):
+    """栏缝左右两侧各有多少个块（跨栏缝的块不计入任何一侧）。"""
+    left = 0
+    right = 0
+    for block in blocks:
+        bbox = _block_bbox(block)
+        if bbox is None:
+            continue
+        if bbox[2] <= x:
+            left += 1
+        elif bbox[0] >= x:
+            right += 1
+    return left, right
+
+
+def _cross_span(blocks, x):
+    """跨过 x 的块在纵向覆盖了多高（0~1）。
+
+    标题、表头可能只在一小段高度上跨过中线；真正填满整栏的通栏表格
+    会跨过大部分页高。用它区分“可以容忍的少量跨栏”和“这不是栏缝”。
+    """
+    intervals = []
+    for block in blocks:
+        bbox = _block_bbox(block)
+        if bbox is not None and bbox[0] < x < bbox[2]:
+            intervals.append((bbox[1], bbox[3]))
+
+    if not intervals:
+        return 0.0
+
+    intervals.sort()
+    total = 0.0
+    start, end = intervals[0]
+    for y0, y1 in intervals[1:]:
+        if y0 <= end:
+            if y1 > end:
+                end = y1
+        else:
+            total += end - start
+            start, end = y0, y1
+    total += end - start
+    return total
+
+
+def _choose_gutter(profile, blocks):
+    """从投影结果里选栏缝；找不到合格栏缝时返回 None。"""
+    runs = profile["zero_runs"]
+    if runs:
+        run = _widest_run(runs)
+        coverage = 0
+        method = "zero_gap"
+    elif profile["min_count"] <= GUTTER_MAX_COVERAGE:
+        run = _widest_run(profile["min_runs"])
+        coverage = profile["min_count"]
+        method = "min_coverage"
+    else:
+        # 少量块跨过栏缝（标题行、表头）：只要它们纵向只占一小段，
+        # 仍然可以认这条栏缝；通栏表格会占掉大半页高，会被排除。
+        short_runs = []
+        for candidate_run in profile["min_runs"]:
+            x = _run_midpoint(candidate_run)
+            if _cross_span(blocks, x) <= GUTTER_MAX_CROSS_SPAN:
+                short_runs.append(candidate_run)
+        if not short_runs:
+            return None
+        run = _widest_run(short_runs)
+        coverage = profile["min_count"]
+        method = "short_crossings"
+
+    x = _run_midpoint(run)
+    left, right = _side_counts(blocks, x)
+    if left < GUTTER_MIN_SIDE_BLOCKS or right < GUTTER_MIN_SIDE_BLOCKS:
+        return None
+
+    return {
+        "x": x,
+        "coverage": coverage,
+        "left": left,
+        "right": right,
+        "crossSpan": round(_cross_span(blocks, x), 3),
+        "method": method,
+    }
+
+
+def _find_candidate_gutter(page_blocks):
+    """第一遍：只用窄块找候选栏缝，避免表格行/标题污染投影。
+
+    找不到候选栏缝时，这一页按单栏处理，不做任何切带。
+    """
+    narrow = []
+    for block in page_blocks:
+        width = _block_width(block)
+        if (
+            width is not None
+            and width <= NARROW_MAX_WIDTH
+            and _is_meaningful_block(block)
+        ):
+            narrow.append(block)
+
+    if len(narrow) < GUTTER_MIN_SIDE_BLOCKS * 2:
+        return None
+
+    profile = _gutter_profile(narrow)
+    return _choose_gutter(profile, narrow)
+
+
+def _detect_gutter(band_blocks):
+    """在一个带内找栏间空白（gutter）；单栏带返回 None。"""
+    meaningful = [block for block in band_blocks if _is_meaningful_block(block)]
+    if len(meaningful) < GUTTER_MIN_SIDE_BLOCKS * 2:
+        return None
+    profile = _gutter_profile(meaningful)
+    return _choose_gutter(profile, meaningful)
+
+
+def _split_bands(page_blocks, candidate_gutter=None):
+    """按通栏块 / 跨栏块把一页切成若干横带（#79 #80）。
+
+    参数:
+        page_blocks: 一页的 block 列表
+        candidate_gutter: 候选栏缝 x；传入时，跨过它的块也作为切带屏障
+
+    返回:
+        [
+            {
+                "blocks": [...],       # 保持输入顺序
+                "full_width": bool,    # 是否是横跨整页的屏障带
+                "y0": float | None,
+                "y1": float | None,
+            },
+            ...
+        ]
+        带序自上而下；块只换带，不丢、不重、不修改。
+    """
+    valid = []
+    invalid = []
+    for index, block in enumerate(page_blocks):
+        if _block_bbox(block) is None:
+            invalid.append((index, block))
+        else:
+            valid.append((index, block))
+
+    if not valid:
+        return [{
+            "blocks": list(page_blocks),
+            "full_width": False,
+            "y0": None,
+            "y1": None,
+        }]
+
+    ordered = sorted(
+        valid,
+        key=lambda item: (
+            _block_bbox(item[1])[1],
+            _block_bbox(item[1])[0],
+            item[0],
+        ),
+    )
+
+    band_id = [0] * len(page_blocks)
+    bands = []
+
+    for index, block in ordered:
+        barrier = _is_full_width_block(block)
+        if (
+            candidate_gutter is not None
+            and _is_layout_block(block)
+            and _crosses(block, candidate_gutter)
+        ):
+            barrier = True
+
+        if barrier:
+            # 连续屏障（例如表格的多行）合并成一个带
+            if bands and bands[-1]["full_width"]:
+                band_id[index] = len(bands) - 1
+            else:
+                bands.append({"blocks": [], "full_width": True})
+                band_id[index] = len(bands) - 1
+        else:
+            if not bands or bands[-1]["full_width"]:
+                bands.append({"blocks": [], "full_width": False})
+            band_id[index] = len(bands) - 1
+
+    # bbox 非法的块无法参与排序：挂到它前面最近的有效块所属的带，
+    # 保证不丢块，也不把顺序整体打乱。
+    last_band = 0
+    for index, block in enumerate(page_blocks):
+        if _block_bbox(block) is not None:
+            last_band = band_id[index]
+        else:
+            band_id[index] = last_band
+
+    # 按原始顺序回填：单栏页只有一个带时，块顺序与输入完全一致
+    for index, block in enumerate(page_blocks):
+        bands[band_id[index]]["blocks"].append(block)
+
+    for band in bands:
+        y0, y1 = _band_bounds(band["blocks"])
+        band["y0"] = y0
+        band["y1"] = y1
+
+    return bands
+
+
+def build_page_layout(page_blocks):
+    """返回一页的版面结构（#79 #80 的集成入口）。
+
+    输出:
+        {
+            "layout": "single" | "double" | "unknown",
+            "candidateGutter": float | None,
+            "bands": [
+                {
+                    "blocks": [...],
+                    "full_width": bool,
+                    "y0": float | None,
+                    "y1": float | None,
+                    "gutter": float | None,
+                    "layout": "full_width" | "double" | "single" | "unknown",
+                },
+                ...
+            ],
+        }
+
+    单栏守卫：找不到候选栏缝时，整页一个带、保持原顺序；
+    这样单栏论文即使正文块很宽，也不会被误切。
+    """
+    candidate = _find_candidate_gutter(page_blocks)
+
+    if candidate is None:
+        blocks = list(page_blocks)
+        y0, y1 = _band_bounds(blocks)
+        layout = "single" if _has_valid_bbox(blocks) else "unknown"
+        return {
+            "layout": layout,
+            "candidateGutter": None,
+            "bands": [{
+                "blocks": blocks,
+                "full_width": False,
+                "y0": y0,
+                "y1": y1,
+                "gutter": None,
+                "layout": layout,
+            }],
+        }
+
+    bands = _split_bands(page_blocks, candidate["x"])
+    has_double = False
+
+    for band in bands:
+        if band["full_width"]:
+            band["gutter"] = None
+            band["layout"] = "full_width"
+            continue
+
+        gutter = _detect_gutter(band["blocks"])
+        if gutter is None:
+            band["gutter"] = None
+            band["layout"] = "single"
+        else:
+            band["gutter"] = gutter["x"]
+            band["layout"] = "double"
+            has_double = True
+
+    return {
+        "layout": "double" if has_double else "single",
+        "candidateGutter": candidate["x"],
+        "bands": bands,
+    }
 
 
 def build_chunks(blocks):
