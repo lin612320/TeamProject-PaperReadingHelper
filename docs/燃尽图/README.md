@@ -1,7 +1,20 @@
 # 燃尽图操作手册
 
-> 用途：满足 Alpha 阶段 Scrum Meeting 博客的强制项（需求分析 PPT 第 3 页第 ②条）。
-> 负责人：**P7**（每日记录）· 审核：**P1** · 数据来源：`docs/alpha/Alpha_Issue清单.md`
+> 用途：满足 Scrum Meeting 博客的强制项（需求分析 PPT 第 3 页第 ②条）。
+> 负责人：**P7**（每日记录）· 审核：**P1**
+
+---
+
+## 〇、Alpha / Beta 两张表两套基线（2026-11-19 起）
+
+| 轮次 | 数据表 | 生成图 | 基线 | 日号 |
+|---|---|---|---|---|
+| **Alpha**（已收官） | `燃尽图模板.csv` | `燃尽图-Alpha-最终-D20.png`（归档） | 28 → 37 条 | D0–D20 |
+| **Beta**（进行中） | `燃尽图-Beta模板.csv` | **`燃尽图-Beta-当前.png`（当前看这张）** | **51 条**（#51–#101） | B0–B24 |
+
+- 两轮的日号**各自从 0 起算**，不接续（Alpha 是 D，Beta 是 B），避免 21–44 日号把横轴拉爆
+- Beta 理想线 = `51 × (1 − d/24)`，24 天对应 **11-18 → 12-11**
+- 两表都含计划日的理想值，实际列每天只填当天
 
 ---
 
@@ -99,9 +112,11 @@
 
 | 文件 | 说明 |
 |---|---|
-| `燃尽图模板.csv` | 16 行（D0–D15），理想列已填好，实际列每天填 |
-| `燃尽图-第6周.png` | 待生成 |
-| `燃尽图-第7周.png` | 待生成 |
+| `燃尽图模板.csv` | **Alpha** 表（D0–D20），已完成，实际列已填满 |
+| `燃尽图-Beta模板.csv` | **Beta** 表（B0–B24），理想列已填，实际列每天填 |
+| `燃尽图-Alpha-最终-D20.png` | Alpha 收官图（37 条全部收口） |
+| `燃尽图-Beta-当前.png` | **Beta 当前图**，每天刷新 |
+| `燃尽图-第6周.png` / `燃尽图-第7周.png` | Alpha 期间两份博客用图 |
 
 ---
 
@@ -125,7 +140,7 @@ cd PaperMind
 
 | 位置 | 看到什么 | 适合 |
 |---|---|---|
-| **docs/燃尽图/燃尽图-当前.md** | 生成的 PNG 曲线，GitHub 网页直接渲染 | 每天扫一眼、给老师看 |
+| **docs/燃尽图/燃尽图-当前.md** | 当前轮次的 PNG 曲线（Beta），GitHub 网页直接渲染 | 每天扫一眼、给老师看 |
 | 终端 | 跑脚本后打印的迷你条形图 | 站会当场报数 |
 | Excel / WPS | 打开 CSV 自己画 | 出正式图（博客用） |
 
@@ -133,8 +148,9 @@ cd PaperMind
 
 ``powershell
 cd PaperMind
-.\scripts\burndown.ps1 -Remaining 24        # 1. 记数
-.\scripts\burndown-chart.ps1                # 2. 重画图
+.\scripts\burndown.ps1 -Csv docs\燃尽图\燃尽图-Beta模板.csv -Remaining 47   # 1. 记数（Beta）
+.\scripts\burndown-chart.ps1 -Csv docs\燃尽图\燃尽图-Beta模板.csv `
+    -Out docs\燃尽图\燃尽图-Beta-当前.png -Title "Beta 冲刺燃尽图（11-18 → 12-11 · 51 条）" -MarkLabel ""
 git add docs/燃尽图; git commit -m "chore: 更新燃尽图 (#3)"; git push
 ``
 
