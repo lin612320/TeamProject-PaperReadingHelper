@@ -2,7 +2,7 @@
 -- PaperMind · 数据库表结构契约（PostgreSQL 16 + pgvector）
 -- ============================================================================
 -- 谁和谁的约定：P6 刘征（建表） ↔ P4 刘万礼（读写 papers） ↔ P5 吴啸天（读写 chunks）
--- 版本：1.0.0-frozen   冻结日期：2026-10-24（P1 裁定提前冻结）
+-- 版本：1.1.0-frozen   冻结日期：2026-11-23（Beta W2，新增 users 表与 user_id 外键）
 --
 -- 【它管什么】
 --   三个人的代码都往这几张表读写，字段名错一个字母就查不出来。
@@ -21,8 +21,40 @@
 --   手动执行：psql -U papermind -d papermind -f 03-数据库表结构.sql
 -- ============================================================================
 
+-- ────────────────────────────────────────────────────────────
+-- 版本变更记录（changelog）
+--   1.0.0  2026-10-24  四张表基线（papers / chunks / reading_session / annotation）
+--   1.1.0  2026-11-23  Beta 多用户隔离：新增 users 表；papers.user_id 加外键；
+--                       存量 papers 归 legacy 账号（user_id = 1）
+-- ────────────────────────────────────────────────────────────
+
 -- pgvector 扩展：向量检索靠它，必须最先建
 CREATE EXTENSION IF NOT EXISTS vector;
+
+
+-- ============================================================================
+-- 表 0：users —— 用户账号（Beta 多用户隔离的基础，先于 papers 建）
+-- 谁写：P4（注册时插入）
+-- 谁读：P4（登录校验）、JwtFilter（验签后取 user_id）
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS users (
+    id                BIGSERIAL    PRIMARY KEY,
+    username          TEXT         NOT NULL UNIQUE,          -- 登录名，全库唯一
+    password_hash     TEXT         NOT NULL,                 -- bcrypt 哈希，不存明文、不写日志
+    created_at        TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE  users             IS '用户账号，Beta 多用户隔离的依据';
+COMMENT ON COLUMN users.password_hash IS 'bcrypt 哈希；绝不明文存储、绝不写日志';
+
+-- legacy 账号：Alpha 所有 papers 都挂在 user_id=1 下，先落一个占位账号保证外键成立；
+-- 该账号不用于登录（password_hash 为占位符）。显式插 id=1 后要把序列拨到 1，
+-- 否则下一个注册用户会从序列拿 1，撞上 legacy 的 id。
+INSERT INTO users (id, username, password_hash)
+VALUES (1, 'legacy', '!disabled')
+ON CONFLICT (id) DO NOTHING;
+
+SELECT setval('users_id_seq', (SELECT MAX(id) FROM users));
 
 
 -- ============================================================================
@@ -33,8 +65,9 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE IF NOT EXISTS papers (
     id                BIGSERIAL    PRIMARY KEY,
 
-    -- Alpha 阶段不做登录，固定为 1；Beta 接真实用户后再用
-    user_id           BIGINT       NOT NULL DEFAULT 1,
+    -- 归属用户；Beta 起通过外键关联 users(id)，legacy 数据归 user_id=1
+    user_id           BIGINT       NOT NULL DEFAULT 1
+                      CONSTRAINT fk_papers_user REFERENCES users(id),
 
     title             TEXT         NOT NULL,                 -- 默认取文件名，P4 可后续支持手动改
     filename          TEXT         NOT NULL,                 -- 原始文件名，用于前端显示
@@ -76,6 +109,28 @@ CREATE INDEX IF NOT EXISTS idx_papers_user_created
 -- 前端轮询解析状态时按 id 查，主键已覆盖；这里给状态过滤留一条
 CREATE INDEX IF NOT EXISTS idx_papers_parse_status
     ON papers (parse_status);
+
+
+-- ────────────────────────────────────────────────────────────
+-- 存量库迁移（2026-11-23，契约 1.1.0 起 users 表 + papers 外键启用）
+--   ⚠️ 只改本文件不会影响已经建好的库，必须在存量库上单独执行一次
+--   幂等：可重复执行。users 表与 legacy 账号已在上方建好（IF NOT EXISTS / ON CONFLICT 兜底），
+--         这里只补「papers 外键」这一件必须 ALTER 的事。
+-- ────────────────────────────────────────────────────────────
+-- 兜底：把无主论文（user_id 不是合法用户）统一归 legacy，保证外键能建上
+UPDATE papers SET user_id = 1 WHERE user_id NOT IN (SELECT id FROM users);
+
+-- 加外键（幂等：PostgreSQL 没有 ADD CONSTRAINT IF NOT EXISTS，用 DO 块兜底）
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_papers_user'
+    ) THEN
+        ALTER TABLE papers
+            ADD CONSTRAINT fk_papers_user
+            FOREIGN KEY (user_id) REFERENCES users(id);
+    END IF;
+END $$;
 
 
 -- ============================================================================
