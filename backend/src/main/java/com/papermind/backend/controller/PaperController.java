@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import com.papermind.backend.common.UserContext;
 
 import java.io.File;
 import java.io.IOException;
@@ -67,12 +68,13 @@ public class PaperController {
                 + "parse_status AS \"parseStatus\", "
                 + "source, "
                 + CREATED_AT_SQL
-                + "FROM papers WHERE user_id = 1 "
+                + "FROM papers WHERE user_id = ? "
                 + "ORDER BY created_at DESC LIMIT ? OFFSET ?",
-            size, (page - 1) * size);
+            UserContext.currentUserId(), size, (page - 1) * size);
 
         Integer total = jdbcTemplate.queryForObject(
-            "SELECT count(*) FROM papers WHERE user_id = 1", Integer.class);
+            "SELECT count(*) FROM papers WHERE user_id = ?", Integer.class,
+            UserContext.currentUserId());
 
         Map<String, Object> data = new HashMap<>();
         data.put("total", total);
@@ -91,8 +93,8 @@ public class PaperController {
         String storedPath;
         try {
             storedPath = jdbcTemplate.queryForObject(
-                "SELECT file_path FROM papers WHERE id = ? AND user_id = 1",
-                String.class, paperId);
+                "SELECT file_path FROM papers WHERE id = ? AND user_id = ?",
+                String.class, paperId, UserContext.currentUserId());
         } catch (EmptyResultDataAccessException e) {
             throw new BizException(ErrorCode.PAPER_NOT_FOUND);
         }
@@ -121,13 +123,14 @@ public class PaperController {
         String storedPath;
         try {
             storedPath = jdbcTemplate.queryForObject(
-                "SELECT file_path FROM papers WHERE id = ? AND user_id = 1",
-                String.class, paperId);
+                "SELECT file_path FROM papers WHERE id = ? AND user_id = ?",
+                String.class, paperId, UserContext.currentUserId());
         } catch (EmptyResultDataAccessException e) {
             throw new BizException(ErrorCode.PAPER_NOT_FOUND);
         }
 
-        jdbcTemplate.update("DELETE FROM papers WHERE id = ? AND user_id = 1", paperId);
+        jdbcTemplate.update("DELETE FROM papers WHERE id = ? AND user_id = ?",
+            paperId, UserContext.currentUserId());
 
         try {
             Files.deleteIfExists(resolveFile(storedPath).toPath());
@@ -180,10 +183,10 @@ public class PaperController {
         }
 
         Long newId = jdbcTemplate.queryForObject(
-            "INSERT INTO papers (title, filename, file_path, file_size_bytes, parse_status) "
-                + "VALUES (?, ?, ?, ?, 'pending') RETURNING id",
+            "INSERT INTO papers (user_id, title, filename, file_path, file_size_bytes, parse_status) "
+                + "VALUES (?, ?, ?, ?, ?, 'pending') RETURNING id",
             Long.class,
-            title, originalName, savedName, file.getSize());
+            UserContext.currentUserId(), title, originalName, savedName, file.getSize());
 
         parseService.parseAsync(newId, target.getAbsolutePath());
 
@@ -212,8 +215,8 @@ public class PaperController {
                     + "external_url AS \"externalUrl\", "
                     + "file_size_bytes AS \"fileSize\", "
                     + CREATED_AT_SQL
-                    + "FROM papers WHERE id = ? AND user_id = 1",
-                paperId);
+                    + "FROM papers WHERE id = ? AND user_id = ?",
+                paperId, UserContext.currentUserId());
         } catch (EmptyResultDataAccessException e) {
             throw new BizException(ErrorCode.PAPER_NOT_FOUND);
         }

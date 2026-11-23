@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.papermind.backend.common.UserContext;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -65,8 +66,8 @@ public class QaController {
         String status;
         try {
             status = jdbcTemplate.queryForObject(
-                "SELECT parse_status FROM papers WHERE id = ? AND user_id = 1",
-                String.class, paperId);
+                "SELECT parse_status FROM papers WHERE id = ? AND user_id = ?",
+                String.class, paperId, UserContext.currentUserId());
         } catch (EmptyResultDataAccessException e) {
             throw new BizException(ErrorCode.PAPER_NOT_FOUND);
         }

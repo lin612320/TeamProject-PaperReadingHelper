@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
   title: PaperMind API
-  version: 1.3.0-frozen
+  version: 1.3.1-frozen
   description: |
-    PaperMind 论文阅读助手接口契约（**1.3.0 于 2026-11-17 由 P1 拍板冻结**；沿用 1.0.0 的做法——先冻结、在 11-19 例会向全员通报，**不等回执**。1.0.0 于 2026-10-24、1.1.0 于 2026-11-08、1.2.0 于 2026-11-10 冻结，变更须经 P1 并升版本号）。
+    PaperMind 论文阅读助手接口契约（**1.3.1 于 2026-11-20 冻结：修正 bboxMode 语义**；1.3.0 于 2026-11-17 由 P1 拍板冻结**；沿用 1.0.0 的做法——先冻结、在 11-19 例会向全员通报，**不等回执**。1.0.0 于 2026-10-24、1.1.0 于 2026-11-08、1.2.0 于 2026-11-10 冻结，变更须经 P1 并升版本号）。
 
     **1.3.0 包含**：auth 四接口（注册 / 登录 / 当前用户 / 登出）、`chunks.reading_order` 阅读顺序、`citations[].readingOrder`、划词低质输入拦截规则、越权口径（2001），以及新增错误码段 **6001–6003**。
 
@@ -546,10 +546,15 @@ components:
           nullable: true
           enum: [precise, block]
           description: |
-            bbox 的精度来源（1.1.0 新增）：
-            - `precise` = 单栏正文，框对应原句所在块，前端可直接画细框
-            - `block`   = 双栏或版面复杂，框是整块/整段范围，**前端不得当作逐句精确定位**
+            bbox 的**精度级别**（1.1.0 引入，**1.3.1 修正语义**）——判据是"框画得多准"，**与单栏/双栏无关**：
+
+            - `precise` = 框精确到目标段落，**且不跨栏**（x0/x1 落在同一栏区间）。单栏、双栏都可能命中
+            - `block`   = 框降级为整段/跨栏并集。**前端不得当作逐句精确定位**（画虚线）
             - `null`    = 无坐标，前端退回「只跳页不画框」
+
+            ⚠️ 1.3.0 及更早把 `precise` 绑死为"单栏正文"、`block` 绑死为"双栏或版面复杂"，
+            Beta B03 在有栏信息后能给双栏输出栏内段落框，旧定义与验收标准自相矛盾（BUG-023）。
+            1.3.1 起只按两条判据取值：① 是否不跨栏 ② 是否只覆盖目标段落而非整段并集。
           example: precise
 
     AskRequest:
@@ -750,6 +755,7 @@ x-conventions:
   freeze:
     frozen_at: 2026-10-24
     frozen_at_1_3_0: 2026-11-17
+    frozen_at_1_3_1: 2026-11-20
     review_gate: 2026-10-24 由 P1 林子航裁定提前冻结（未经集体评审，D1 站会向全员通报）
     review_gate_1_3_0: |
       2026-11-17 由 P1 拍板冻结，沿用 1.0.0 的先例：**先冻结、11-19 例会向全员通报，不等回执**。
@@ -803,6 +809,16 @@ x-conventions:
           3. **Citation 增 readingOrder**（页内阅读顺序，可空），配合 chunks.reading_order
           4. **划词低质输入拦截规则**写入 explain_guard：空 / 长度<2 / 纯数字 → 前端不弹浮层
           5. tags 中 search 的「Beta 预留」更正为「1.1.0 起实装」
+      - version: 1.3.1-frozen
+        date: 2026-11-20
+        status: frozen（P1 拍板，例会通报）
+        note: |
+          **只修正 bboxMode 的语义定义，不改任何字段与错误码**（BUG-023）：
+          1. 旧定义把 precise 绑"单栏"、block 绑"双栏"，与 B03 验收（双栏 ≥7 precise）自相矛盾
+          2. 新定义只看两条判据：是否不跨栏、是否只覆盖目标段落；与版面类型无关
+          3. 新增 x-conventions.coordinate.behavior_1_3_1，behavior_1_1_0 标记为历史
+          4. 前端零改动：仍按三态决定实线/虚线/只闪页，不判断单双栏
+          5. Alpha 的「双栏 65/65 全 block」在旧定义下合规，不算缺陷
 
   # ↓↓↓ 1.3.0 新增：三条全队约定（#51 #52 #53） ↓↓↓
   auth:
@@ -875,7 +891,9 @@ x-conventions:
     bbox_origin: 左上角为原点，x 向右、y 向下
     bbox_relative_to: 单页宽度 / 单页高度
     alpha_behavior: ❌ 已作废（1.0.x 写「四个 bbox 字段一律返回 null」）—— 1.1.0 起真实填充
-    behavior_1_1_0: "单栏论文返回精确块坐标并标 bboxMode=precise；双栏或复杂版面降级为整块范围并标 bboxMode=block；确实无法定位时四个字段为 null 且 bboxMode 为 null，前端退回「只跳页不画框」"
+    behavior_1_1_0: "（1.3.1 起被 behavior_1_3_1 取代，保留作历史）单栏返回 precise、双栏降级 block"
+    behavior_1_3_1: "按精度取值：框不跨栏且只覆盖目标段落 → precise；框跨栏或只能给整段并集 → block；无坐标 → null。单栏/双栏都可能是 precise，双栏也不再默认 block"
+    why_1_3_1: "B03 引入栏信息后可输出栏内段落框；旧定义以版面类型判据，导致 B01（双栏必须 block）与 B03（双栏 ≥7 precise）互相矛盾（BUG-023）"
     bbox_mode_field: "接口字段 bboxMode（camelCase）；数据库列建议 bbox_mode（可空，取值 precise/block）；AI 服务内部为 bbox_mode"
     bbox_mode_db_status: "⚠️ 2026-11-08 核对：docs/契约/03-数据库表结构.sql 只有 bbox_x0/y0/x1/y1，尚无 bbox_mode 列，需 P6 补迁移"
     bbox_mode_ddl: "ALTER TABLE chunks ADD COLUMN bbox_mode TEXT CHECK (bbox_mode IN ('precise','block'));"

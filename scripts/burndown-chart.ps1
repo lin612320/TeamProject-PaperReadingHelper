@@ -12,7 +12,9 @@
 param(
     [string] $Csv = (Join-Path $PSScriptRoot '..\docs\燃尽图\燃尽图模板.csv'),
     [string] $Out = (Join-Path $PSScriptRoot '..\docs\燃尽图\燃尽图-当前.png'),
-    [string] $Title = 'Alpha 冲刺燃尽图'
+    [string] $Title = 'Alpha 冲刺燃尽图',
+    # 新基线起点的竖线标注；传空字符串则不画（Beta 轮次从 0 起算，不需要这条标记）
+    [string] $MarkLabel = 'scope 变更 +11'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -125,15 +127,15 @@ foreach ($p in $points) {
     $prev = $p
 }
 
-# scope 变更竖线（标在新基线起点）
+# scope 变更竖线（标在新基线起点；MarkLabel 为空时跳过）
 $firstNew = $points | Where-Object { $null -ne $_.Ideal } | Select-Object -First 1
-if ($null -ne $firstNew) {
+if ($null -ne $firstNew -and -not [string]::IsNullOrWhiteSpace($MarkLabel)) {
     $vx = X $firstNew.Day
     $cMark = ([System.Drawing.Color]::FromArgb(185,140,30))
     $vPen = New-Object System.Drawing.Pen $cMark, 1.5
     $vPen.DashStyle = [System.Drawing.Drawing2D.DashStyle]::Dash
     $g.DrawLine($vPen, $vx, $mT, $vx, $mT + $plotH)
-    $lbl = 'scope 变更 +11'
+    $lbl = $MarkLabel
     $szl = $g.MeasureString($lbl, $smallFont)
     $g.DrawString($lbl, $smallFont, (New-Object System.Drawing.SolidBrush $cMark), [math]::Max($mL + 2, $vx - $szl.Width - 6), $mT + 4)
 }
@@ -155,10 +157,17 @@ foreach ($p in $points) {
 $lx = $mL + 10; $ly = $mT - 28
 $g.DrawLine($idealPen, $lx, $ly + 6, $lx + 30, $ly + 6)
 $g.DrawString('理想（新基线）', $font, (New-Object System.Drawing.SolidBrush $cIdeal), $lx + 36, $ly - 2)
-$g.DrawLine($oldIdealPen, $lx + 190, $ly + 6, $lx + 220, $ly + 6)
-$g.DrawString('旧基线（scope 变更前）', $smallFont, (New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(175,175,188))), $lx + 226, $ly)
-$g.DrawLine($actualPen, $lx + 400, $ly + 6, $lx + 430, $ly + 6)
-$g.DrawString('实际剩余', $font, (New-Object System.Drawing.SolidBrush $cActual), $lx + 436, $ly - 2)
+# 旧基线图例：仅当本表确有旧基线数据时才画（Beta 表 没有该列数据，画出来会误导读图的人）
+$hasOld = @($points | Where-Object { $null -ne $_.OldIdeal }).Count -gt 0
+if ($hasOld) {
+    $g.DrawLine($oldIdealPen, $lx + 190, $ly + 6, $lx + 220, $ly + 6)
+    $g.DrawString('旧基线（scope 变更前）', $smallFont, (New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(175,175,188))), $lx + 226, $ly)
+    $actualLegendX = 400
+} else {
+    $actualLegendX = 190
+}
+$g.DrawLine($actualPen, $lx + $actualLegendX, $ly + 6, $lx + $actualLegendX + 30, $ly + 6)
+$g.DrawString('实际剩余', $font, (New-Object System.Drawing.SolidBrush $cActual), $lx + $actualLegendX + 36, $ly - 2)
 
 # 右下角状态
 $filled = @($points | Where-Object { $null -ne $_.Actual })

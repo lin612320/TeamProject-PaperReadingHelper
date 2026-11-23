@@ -1,8 +1,9 @@
-# Alpha Bug List
+# Bug List（Alpha + Beta）
 
-> P7 李义朋 · [#25](https://github.com/lin612320/TeamProject-PaperReadingHelper/issues/25) · **v1.3 · 2026-11-12** · 测试版本 `master`（容器化）
+> P7 李义朋 · [#25](https://github.com/lin612320/TeamProject-PaperReadingHelper/issues/25) · **v1.5 · 2026-11-23** · 测试版本 `master`（容器化）
 > 版式：概览表（5 列，一屏可读）+ 每条明细分块。
-> **状态：18 条 · 已修复 17 · 不修复 1（BUG-012，接受风险）· 待修复 0**（最近一次复测：2026-11-12，BUG-017/018/019 均已关闭）
+> **状态：25 条 · 已修复 18 · 不修复 1（BUG-012，接受风险）· 待修复 6**（BUG-020 契约待补、BUG-021 契约待升、BUG-022 随 `#86`、BUG-024/025/026 多用户隔离漏洞）
+> 分区：BUG-001～019 为 Alpha 段；**BUG-020～023 为 Beta 段**（2026-11-18 起，来自 P1 契约对账与用户视角自查）；**BUG-024～026 为 Beta 代码审查项**（2026-11-23 拉取 #74/#75 后审出）
 
 ## 概览
 
@@ -26,8 +27,15 @@
 | BUG-017 | S1  | P4        | 已修复       | `/api/search` 降级时缺 `degraded` / `cached` 标记，前端无法区分“没结果”与“网断了”         |
 | BUG-018 | S2  | P6        | 已修复 | 检索命中缓存时 `message` 里的更新时间用 UTC，比北京时间慢 8 小时                             |
 | BUG-019 | S0  | P6        | 已修复 | `chunks.bbox_mode` 列未创建，`RAG.py` 查询报错 → `/api/qa/ask` 全部 3001，问答主链不可用 |
+| BUG-020 | S2  | P4        | 待修复 | `papers` 列表/详情返回字段与契约不一致（缺 3、多 2） |
+| BUG-021 | S1  | P4        | 已修代码（契约待升） | 检索超时 10s 与实测 9.19s 冲突，检索必然降级 |
+| BUG-022 | S2  | P5        | 待修复 | `citations` 缺 `readingOrder`（契约 1.3.0 已冻结） |
+| BUG-023 | S2  | P1（契约）  | 已修复 | `bboxMode` 按版面类型定值，与 B03 验收互斥（文档矛盾） |
+| BUG-024 | S1  | P4        | 待修复 | `/api/explain` 不校验论文归属，跨用户读到他人标题与正文片段 |
+| BUG-025 | S1  | P6        | 待修复 | `ai-service:8000` 对外发布且 `/internal/*` 无鉴权，绕过 backend 校验 |
+| BUG-026 | S2  | P4        | 待修复 | `UserContext` 未设置时静默回退 user 1，开 enforce 后变越权 |
 
-**统计**：18 条 · 已修复 17 · 不修复 1（BUG-012，接受风险）· 待修复 0
+**统计**：25 条 · 已修复 18 · 不修复 1（BUG-012，接受风险）· 待修复 6
 
 级别：**S0** 主链断（演示走不通）· **S1** 验收不达标 · **S2** 体验或契约一致性
 （S = Severity，与分工编号 P1–P7 区分；归属列的 P3/P4 才是人）
@@ -268,7 +276,67 @@
 
 ---
 
-## 编号说明
+### BUG-023 · `bboxMode` 按版面类型定值，与 B03 验收互斥（S2 · P1（契约） · 已修复）
+
+- **发现**：2026-11-20 · P1 林子航 · 需求卡交叉复核（B01 vs B03）
+- **现象**：同一套文档里两条互斥的验收：
+  - 契约 1.3.0 的 `bboxMode` 描述 + B01 验收第 4 条：**双栏页一律 `block`，不得冒充 `precise`**
+  - B03 验收第 1 条：**双栏论文 10 题 `bboxMode=precise` 命中 ≥7**
+  - 按 1.3.0 口径实现，B03 命中率**恒为 0**——这条验收不可达
+- **根因**：`bboxMode` 一开始按**版面类型**（单栏/双栏）定值，而 B03 要的是**框精度**（是否框住那一段、是否跨栏）。维度选错了，不是实现出错
+- **影响**：若不改，P2 做 B03 时要么违反契约，要么交不出验收；Review 时两边都能"有理"
+- **修法**：契约升 **1.3.1-frozen**，把 `bboxMode` 定义从版面类型改为精度：`precise` = 框覆盖目标段落且不跨栏；`block` = 多块并集 / 跨栏；`null` = 无坐标。单栏双栏不再直接决定取值
+- **连带**：B01 验收第 4 条改为精度口径（重排后给不出栏内段落框就如实标 `block`）；`docs/契约/01-api-contract.yaml`、`契约1.3.0-评审要点.md` 第七节同步；**前端不改**（本来就只按三态切样式）
+- **复核结论**：Alpha 的「双栏 65/65 全 `block`」在 1.3.0 口径下**合规**，不算缺陷，不单列 Bug
+- **修复**：P1 契约 `1.3.1-frozen`（2026-11-20），例会通报，不等回执
+
+---
+
+### BUG-024 · `/api/explain` 不校验论文归属，跨用户可读到他人标题与正文片段（S1 · P4 · 待修复）
+
+- **发现**：2026-11-23 · P1 林子航 · 拉取 #74/#75 提交后代码审查
+- **现象**：`#75`（qa + explain + import 三处过滤）已提交 `098b4fc`，但**实际只做了 qa 与 import**：
+  - `ExplainController.java` 全文**没有任何 `JdbcTemplate` / `UserContext` 引用**（逐行核对，零命中）
+  - 它把前端传来的 `paperId` **原样转发**给 ai-service
+  - `ai-service/app/routers/explain.py:38` → `select title from papers where id = %s`
+  - `ai-service/app/routers/explain.py:53` → `select content from chunks where paper_id = %s` —— **两处都无 user 维度**
+- **可复现路径**：登录用户 A 在划词浮层里传 B 的 `paperId` → 走 `/api/explain` → ai-service 取 B 的标题与匹配到的 chunk 正文拼成上下文 → 译文/释义里带出 B 的论文内容
+- **违约点**：契约 1.3.0 `x-conventions.authz` 把**划词解释**明确列为 6 处之一，要求越权一律 **2001 / HTTP 404**，且「越权响应不得携带他人任何业务字段，连标题都不许回显」。当前实现把标题直接喂进模型，泄露面比回显更大
+- **根因**：`#75` 的验收是「三处过滤」，但 explain 这一处在 backend 侧没有库访问，容易被当成"无需过滤"跳过；真正的库访问在 ai-service，跨进程后没人认领
+- **修法（二选一，建议第 1 条）**：
+  1. `ExplainController` 拿到 `paperId` 后先 `SELECT 1 FROM papers WHERE id = ? AND user_id = ?`，查不到直接抛 `PAPER_NOT_FOUND`（2001），再转发
+  2. 或把 `userId` 一并传给 ai-service，由 `_load_context` 带 user 条件查
+- **附带**：不传 `paperId` 的划词（纯文本翻译）不受影响，**该路径不要一刀切成 401**
+- **关联**：`#75`、BUG-025
+
+---
+
+### BUG-025 · `ai-service:8000` 对外发布且 `/internal/*` 无鉴权，可绕过 backend 全部校验（S1 · P6 · 待修复）
+
+- **发现**：2026-11-23 · P1 林子航 · 审查多用户隔离时顺带核对部署面
+- **现象**：`docker-compose.yml` 里 `ai-service` 有 `ports: "8000:8000"`，而 `/internal/*`（parse / qa / explain / papers）**没有任何鉴权**，契约 02 也未约定内部令牌
+- **影响**：宿主机（含同网段）直接 `POST http://<host>:8000/internal/explain {"paperId": <别人的>}`，即可绕过 backend 的全部校验（文本长度、mode、越权 2001）读他人标题与 chunk 正文。Beta 加了多用户隔离后，这条从"调试方便"升级成**隔离的旁路**
+- **性质**：Alpha 就存在，非本次提交引入，但本次提交让它的后果变严重
+- **修法（二选一，建议第 1 条）**：
+  1. 去掉 `8000:8000` 发布，只让 compose 网络内可达（backend 走 `http://ai-service:8000` 不受影响）；调试需要时临时 `docker compose port`
+  2. 或内部加共享令牌：compose 注入 `INTERNAL_TOKEN`，两边比对，缺失/不符回 3003
+- **顺带**：若保留发布，至少在 `docs/部署` 里写明"8000 不得暴露到公网"
+
+---
+
+### BUG-026 · `UserContext` 未设置时静默回退 user 1，登录态切换后会变成越权而非报错（S2 · P4 · 待修复）
+
+- **发现**：2026-11-23 · P1 林子航 · 同上
+- **现象**：`UserContext.currentUserId()` 在 ThreadLocal 为空时**返回 `1L`**（`UserContext.java:16`），不抛异常、不打日志
+- **当前为何不出事**：`app.auth.enforce=${AUTH_ENFORCE:false}` 默认 false，未登录请求本来就该按用户 1 走，Alpha 存量的 12 篇也都在 user_id=1 名下，行为与改造前一致，**无回归**
+- **风险**：一旦把 `AUTH_ENFORCE` 打开（#72 注册登录落地后必然要开），任何漏过 JwtFilter 的请求（白名单 URI 精确匹配、加 context-path、`@Async` 线程、将来新增的路径）都会**静默变成用户 1**——不报错、不拦截，直接把别人的数据当自己的读
+- **附带**：`JwtFilter.shouldNotFilter` 用 `request.getRequestURI()` 精确比对 `/api/auth/register`、`/api/auth/login`，末尾带斜杠或前面有 context-path 时白名单失效，会把注册/登录也 401 掉
+- **修法**：
+  1. 回退值改成"按配置"：`enforce=false` 时回退 1（保持兼容并 WARN 一行）；`enforce=true` 时直接抛 `AUTH_TOKEN_INVALID`（6002）
+  2. 白名单改用 `endsWith` 或 `AntPathMatcher`
+- **判据**：`AUTH_ENFORCE=true` 后，不带 `Authorization` 头请求 `/api/papers` 必须回 **401 / 6002**，而不是返回用户 1 的列表
+
+---
 
 - BUG-008 / BUG-009 沿用 P1 端到端走查（`docs/验收走查/走查表-2026-11-04.md`）的编号。
 - 原 BUG-010（无头浏览器渲染卡住）经真机复核为**误判并撤回**，编号腾出后用于「解析超时」。
@@ -278,3 +346,5 @@
 - BUG-018 为检索缓存提示时间用 UTC（2026-11-11 发现，待修复）。
 - BUG-019 为 `chunks.bbox_mode` 列未创建导致问答全 3001（2026-11-11 发现，S0，待修复）。
 - BUG-020/021/022 为 Beta 首轮（2026-11-18）P1 对账与用户反馈产生：字段与契约不一致、检索超时预算错误、readingOrder 未实现。
+- BUG-023 为 Beta 次轮（2026-11-20）P1 复核需求卡时发现：契约 `bboxMode` 语义与 B03 验收互斥，改契约不改代码，已随 1.3.1 关闭。
+- BUG-024/025/026 为 Beta 代码审查项（2026-11-23）：拉取 `#74`/`#75` 提交后逐行核对多用户隔离，审出 explain 漏过滤、内部服务无鉴权、登录态静默回退三个漏洞。**均为审查产出，不是跑测产出**。

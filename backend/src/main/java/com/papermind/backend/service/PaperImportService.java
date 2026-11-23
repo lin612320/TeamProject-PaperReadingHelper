@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import com.papermind.backend.common.UserContext;
 
 import java.io.File;
 import java.net.URI;
@@ -94,9 +95,10 @@ public class PaperImportService {
 
         Long newId = jdbcTemplate.queryForObject(
             "INSERT INTO papers "
-                + "(title, filename, file_path, file_size_bytes, parse_status, source, arxiv_id, external_url, doi) "
-                + "VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?) RETURNING id",
+                + "(user_id, title, filename, file_path, file_size_bytes, parse_status, source, arxiv_id, external_url, doi) "
+                + "VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?) RETURNING id",
             Long.class,
+            UserContext.currentUserId(),
             title, filename, savedName, pdf.length,
             source,
             arxivId.isEmpty() ? null : arxivId,
@@ -113,8 +115,8 @@ public class PaperImportService {
     private Long findExistingByArxivId(String arxivId) {
         try {
             return jdbcTemplate.queryForObject(
-                "SELECT id FROM papers WHERE arxiv_id = ? AND user_id = 1 ORDER BY id DESC LIMIT 1",
-                Long.class, arxivId);
+                "SELECT id FROM papers WHERE arxiv_id = ? AND user_id = ? ORDER BY id DESC LIMIT 1",
+                Long.class, arxivId, UserContext.currentUserId());
         } catch (EmptyResultDataAccessException e) {
             return null;
         }
