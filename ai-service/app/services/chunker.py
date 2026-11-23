@@ -70,13 +70,14 @@ def _tail_pieces(pieces, size):
     """取一个 chunk 末尾 size 个字符覆盖到的来源段。
 
     重叠文本是上一 chunk 的尾巴；引用 bbox 必须把这段也包含进去，
-    否则 200 字 snippet 的开头会落在框外。
+    否则 200 字 snippet 的开头会落在框外。每段保留板块的 reading_order，
+    供 chunk 取“首块顺序”。
     """
     result = []
     remaining = size
     for i in range(len(pieces) - 1, -1, -1):
-        text, bbox = pieces[i]
-        result.append((text, bbox))
+        text, bbox, order = pieces[i]
+        result.append((text, bbox, order))
         remaining -= len(text)
         if remaining <= 0:
             break
@@ -537,6 +538,63 @@ def build_page_layout(page_blocks):
     }
 
 
+def _block_sort_key(block, index):
+    """按 (y0, x0, 原始下标) 排序；bbox 非法的块排在本带末尾。"""
+    bbox = _block_bbox(block)
+    if bbox is None:
+        return (1.0, 1.0, index)
+    return (bbox[1], bbox[0], index)
+
+
+def _order_page_blocks(page_blocks, layout):
+    """按 (band, column, y0, x0) 返回 [(block, reading_order), ...]。
+
+    - 单栏/unknown 页：保持提取顺序，reading_order 从 0 递增。
+    - 双栏页：按 band 自上而下；双栏带内先左栏后右栏，
+      跨栏块（column=-1）排在本带末尾。
+    """
+    if layout["layout"] != "double":
+        return [(block, index) for index, block in enumerate(page_blocks)]
+
+    ordered = []
+    for band in layout["bands"]:
+        band_blocks = band["blocks"]
+        if band["layout"] != "double":
+            sorted_band = sorted(
+                enumerate(band_blocks),
+                key=lambda item: _block_sort_key(item[1], item[0]),
+            )
+            ordered.extend(block for _index, block in sorted_band)
+            continue
+
+        gutter = band["gutter"]
+
+        def band_key(item):
+            index, block = item
+            bbox = _block_bbox(block)
+            if bbox is None:
+                return (2, 1.0, 1.0, index)
+            if bbox[2] <= gutter:
+                column = 0
+            elif bbox[0] >= gutter:
+                column = 1
+            else:
+                column = 2  # 跨栏块排本带末尾（契约里的 column=-1）
+            return (column, bbox[1], bbox[0], index)
+
+        sorted_band = sorted(enumerate(band_blocks), key=band_key)
+        ordered.extend(block for _index, block in sorted_band)
+
+    # 防御：layout 理论上覆盖全部块；若有遗漏，按原顺序补在末尾
+    if len(ordered) != len(page_blocks):
+        seen = set(id(block) for block in ordered)
+        for block in page_blocks:
+            if id(block) not in seen:
+                ordered.append(block)
+
+    return [(block, index) for index, block in enumerate(ordered)]
+
+
 def build_chunks(blocks):
     """把文字块列表切成 chunk 列表。
 
@@ -548,6 +606,7 @@ def build_chunks(blocks):
             chunk_index / page / content / char_count
             bbox_x0 / bbox_y0 / bbox_x1 / bbox_y1
             bbox_mode: "precise" | "block" | None
+            reading_order: 页内阅读顺序（#81），从 0 起
     """
     # 1. 按页分组，保持原顺序
     pages = {}
@@ -580,21 +639,25 @@ def build_chunks(blocks):
         page_blocks = pages[page_no]
         page_double_column = _is_double_column(page_blocks)
 
-        # 2. 把 block 拆成段落，每个段落继承所在块的 bbox
+        # 2. #81：按 (band, column, y0, x0) 排本页块；单栏页保持原顺序
+        page_layout = build_page_layout(page_blocks)
+        ordered_blocks = _order_page_blocks(page_blocks, page_layout)
+
+        # 3. 把 block 拆成段落，每个段落继承所在块的 bbox 和 reading_order
         paragraphs = [
-            (para, _block_bbox(block))
-            for block in page_blocks
+            (para, _block_bbox(block), order)
+            for block, order in ordered_blocks
             for para in block["text"].split("\n\n")
         ]
 
-        # 3. 按 #18 的规则累积成 page_items：
-        #    (text, pieces)，pieces 是 [(段落文本, bbox), ...]
+        # 4. 按 #18 的规则累积成 page_items：
+        #    (text, pieces)，pieces 是 [(段落文本, bbox, reading_order), ...]
         #    文本拼接逻辑必须与旧实现完全一致（700 字上限、长段硬切）。
         page_items = []
         buffer_text = ""
         buffer_pieces = []
 
-        for para, bbox in paragraphs:
+        for para, bbox, order in paragraphs:
             para = para.strip()
             if para == "":
                 continue
@@ -610,19 +673,19 @@ def build_chunks(blocks):
                     buffer_text = ""
                     buffer_pieces = []
                 piece = para[:TARGET_MAX]
-                page_items.append((piece, [(piece, bbox)]))
+                page_items.append((piece, [(piece, bbox, order)]))
                 para = para[TARGET_MAX:]
 
             if buffer_text == "":
                 buffer_text = para
-                buffer_pieces = [(para, bbox)]
+                buffer_pieces = [(para, bbox, order)]
             elif len(buffer_text) + 2 + len(para) <= TARGET_MAX:
                 buffer_text = buffer_text + "\n\n" + para
-                buffer_pieces.append((para, bbox))
+                buffer_pieces.append((para, bbox, order))
             else:
                 page_items.append((buffer_text, buffer_pieces))
                 buffer_text = para
-                buffer_pieces = [(para, bbox)]
+                buffer_pieces = [(para, bbox, order)]
 
         if buffer_text != "":
             page_items.append((buffer_text, buffer_pieces))
@@ -639,9 +702,11 @@ def build_chunks(blocks):
                 content_pieces = previous_tail_pieces + list(pieces)
 
             content_bboxes = [
-                bbox for _piece_text, bbox in content_pieces if bbox is not None
+                bbox for _piece_text, bbox, _order in content_pieces
+                if bbox is not None
             ]
             bbox = _union_bbox(content_bboxes)
+            reading_order = content_pieces[0][2] if content_pieces else None
 
             # 双栏页 / 跨栏 chunk 只能给整段框，老实标 block
             left = any(
@@ -671,6 +736,7 @@ def build_chunks(blocks):
                 "bbox_x1": bbox[2] if bbox is not None else None,
                 "bbox_y1": bbox[3] if bbox is not None else None,
                 "bbox_mode": bbox_mode,
+                "reading_order": reading_order,
             })
             chunk_index = chunk_index + 1
 

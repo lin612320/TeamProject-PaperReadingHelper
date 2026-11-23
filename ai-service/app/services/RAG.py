@@ -33,9 +33,18 @@ def search_chunks(paper_id, question, top_k=3):
     query_vector = vector_to_string(vectors[0])
     with get_connection() as conn:
         with conn.cursor() as cur:
+            # 契约 1.3.0 的 reading_order 由 P6 加列；列未落地时返回 NULL，
+            # 避免像 BUG-019 那样整条 SQL 因缺列失败。
+            cur.execute(
+                "select 1 from information_schema.columns "
+                "where table_name = 'chunks' and column_name = 'reading_order'"
+            )
+            order_expr = "reading_order" if cur.fetchone() is not None else "NULL::int"
+
             cur.execute(
                 "select id, chunk_index, page, content, "
                 "bbox_x0, bbox_y0, bbox_x1, bbox_y1, bbox_mode, "
+                + order_expr + " as reading_order, "
                 "1 - (embedding <=> %s::vector) as similarity "
                 "from chunks where paper_id = %s "
                 "order by embedding <=> %s::vector limit %s",
@@ -55,7 +64,8 @@ def search_chunks(paper_id, question, top_k=3):
             "bbox_x1": row[6],
             "bbox_y1": row[7],
             "bbox_mode": row[8],
-            "similarity": float(row[9]),
+            "reading_order": row[9],
+            "similarity": float(row[10]),
         })
     return results
 
@@ -96,6 +106,8 @@ def _build_citations(chunks, max_citations):
             "bboxX1": chunk.get("bbox_x1"),
             "bboxY1": chunk.get("bbox_y1"),
             "bboxMode": chunk.get("bbox_mode"),
+            # 契约 1.3.0：引用所在 chunk 的页内阅读顺序，老数据可为 null
+            "readingOrder": chunk.get("reading_order"),
         })
     return citations
 
