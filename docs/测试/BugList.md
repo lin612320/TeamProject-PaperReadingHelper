@@ -1,9 +1,9 @@
 # Bug List（Alpha + Beta）
 
-> P7 李义朋 · [#25](https://github.com/lin612320/TeamProject-PaperReadingHelper/issues/25) · **v1.5 · 2026-11-23** · 测试版本 `master`（容器化）
+> P7 李义朋 · [#25](https://github.com/lin612320/TeamProject-PaperReadingHelper/issues/25) · **v1.6 · 2026-11-23** · 测试版本 `master`（容器化）
 > 版式：概览表（5 列，一屏可读）+ 每条明细分块。
-> **状态：25 条 · 已修复 18 · 不修复 1（BUG-012，接受风险）· 待修复 6**（BUG-020 契约待补、BUG-021 契约待升、BUG-022 随 `#86`、BUG-024/025/026 多用户隔离漏洞）
-> 分区：BUG-001～019 为 Alpha 段；**BUG-020～023 为 Beta 段**（2026-11-18 起，来自 P1 契约对账与用户视角自查）；**BUG-024～026 为 Beta 代码审查项**（2026-11-23 拉取 #74/#75 后审出）
+> **状态：26 条 · 已修复 18 · 不修复 1（BUG-012，接受风险）· 待修复 7**（BUG-020 契约待补、BUG-021 契约待升、BUG-022 受 BUG-027 阻塞、BUG-024/025/026 隔离漏洞、BUG-027 缺列）
+> 分区：BUG-001～019 为 Alpha 段；**BUG-020～023 为 Beta 段**（2026-11-18 起，来自 P1 契约对账与用户视角自查）；**BUG-024～027 为 Beta 代码审查项**（2026-11-23 拉取最新提交后审出）
 
 ## 概览
 
@@ -29,13 +29,14 @@
 | BUG-019 | S0  | P6        | 已修复 | `chunks.bbox_mode` 列未创建，`RAG.py` 查询报错 → `/api/qa/ask` 全部 3001，问答主链不可用 |
 | BUG-020 | S2  | P4        | 待修复 | `papers` 列表/详情返回字段与契约不一致（缺 3、多 2） |
 | BUG-021 | S1  | P4        | 已修代码（契约待升） | 检索超时 10s 与实测 9.19s 冲突，检索必然降级 |
-| BUG-022 | S2  | P5        | 待修复 | `citations` 缺 `readingOrder`（契约 1.3.0 已冻结） |
+| BUG-022 | S2  | P5        | 已修代码（受 BUG-027 阻塞） | `citations` 缺 `readingOrder`（契约 1.3.0 已冻结） |
 | BUG-023 | S2  | P1（契约）  | 已修复 | `bboxMode` 按版面类型定值，与 B03 验收互斥（文档矛盾） |
 | BUG-024 | S1  | P4        | 待修复 | `/api/explain` 不校验论文归属，跨用户读到他人标题与正文片段 |
 | BUG-025 | S1  | P6        | 待修复 | `ai-service:8000` 对外发布且 `/internal/*` 无鉴权，绕过 backend 校验 |
 | BUG-026 | S2  | P4        | 待修复 | `UserContext` 未设置时静默回退 user 1，开 enforce 后变越权 |
+| BUG-027 | S1  | P6        | 待修复 | `chunks.reading_order` 无建列语句，#81 写入永不落库 |
 
-**统计**：25 条 · 已修复 18 · 不修复 1（BUG-012，接受风险）· 待修复 6
+**统计**：26 条 · 已修复 18 · 不修复 1（BUG-012，接受风险）· 待修复 7
 
 级别：**S0** 主链断（演示走不通）· **S1** 验收不达标 · **S2** 体验或契约一致性
 （S = Severity，与分工编号 P1–P7 区分；归属列的 P3/P4 才是人）
@@ -273,6 +274,7 @@
 - **根因**：契约 1.3.0 已冻结该字段（`#52`），但实现侧在 `#86`（引用片段与 reading_order 落库）尚未开工，属排期未到
 - **影响**：契约声明了但实现没有 → 若前端此时依赖该字段会拿到 undefined
 - **修法**：随 `#86` 落地；在此之前前端**不得**依赖 `readingOrder`（契约已写明可空）
+- **状态更新（2026-11-23）**：`#81`（`afdcba6`）已把 `RAG._build_citations` 的 `readingOrder` 补上，**代码侧已修**；但 `chunks.reading_order` 这一列全仓没人建（见 **BUG-027**），所以实际取值恒为 `null`。等 BUG-027 补列并重解析后，本单才真正关闭
 
 ---
 
@@ -338,6 +340,25 @@
 
 ---
 
+### BUG-027 · `chunks.reading_order` 全仓没有建列语句，#81 的写入永远落不了库（S1 · P6 · 待修复）
+
+- **发现**：2026-11-23 · P1 林子航 · 查看 `#81`/`#87`/`#88` 提交
+- **现象**：`#81`（`afdcba6`）把 `reading_order` 的写法做齐了——`chunker.py` 产出、`chunks.py` 按列存在与否动态拼 INSERT、`RAG.py` 探测列后 `as reading_order` 输出、`_build_citations` 回填 `readingOrder`。**独独缺列**：
+  - `docs/契约/03-数据库表结构.sql` 的 `chunks` 建表里**没有** `reading_order`（全仓 grep，只命中代码与 `01-api-contract.yaml:867` 的那句 DDL 注释）
+  - `scripts/migrate-users-1.1.0.sql` 只补了 `users` 表与 `papers` 外键，**没补** `chunks.reading_order`
+  - 因此 `_has_column(cur, "reading_order")` 恒为 False → 每次解析都走「列不存在，跳过」分支 → 入库恒 NULL → `citations[].readingOrder` 恒为 `null`
+- **为什么又踩一次**：与 BUG-019（`bbox_mode` 缺列）**同一型**。这次代码侧学乖了（探测列、没列就跳，不会像 BUG-019 那样整条 SQL 炸），但**列本身仍没人建**，于是从"报错"变成"静默为空"——更难发现
+- **影响**：① 契约 1.3.0 声明的 `chunks.reading_order` 与 `citations[].readingOrder` 实际永远拿不到值（BUG-022 从"没实现"变成"实现了但恒 null"）；② **B02 的「当前栏判定」按验收要看阅读顺序里最后可见的块**，没数据就退化成按页判定，等于 B02 白做；③ `#82`（`check_reading_order.py` 基线回归）无从验收
+- **修法（两处都要，缺一不可）**：
+  1. `docs/契约/03-数据库表结构.sql` 的 `chunks` 建表加 `reading_order INT`（契约 01 的口径：页内从 0 起、可空）
+  2. `scripts/migrate-users-1.1.0.sql`（或另起 `migrate-reading-order-1.3.0.sql`）加 `ALTER TABLE chunks ADD COLUMN IF NOT EXISTS reading_order INT;`
+- **核对不了的一步（如实记）**：本想连容器 `\d chunks` 实测确认，但本机 **Docker 引擎当时未启动**，只做了静态核对。所以此条记为「静态确证、运行环境未核验」，等 Docker 起来后补一次 `docker compose exec postgres psql -U papermind -d papermind -c "\d chunks"`
+- **关联**：`#81` `#87` `#88` `#82`、BUG-019、BUG-022
+
+---
+
+## 编号说明
+
 - BUG-008 / BUG-009 沿用 P1 端到端走查（`docs/验收走查/走查表-2026-11-04.md`）的编号。
 - 原 BUG-010（无头浏览器渲染卡住）经真机复核为**误判并撤回**，编号腾出后用于「解析超时」。
 - BUG-014（前端把 worker 加载失败显示成「无法连接到服务器」）与 BUG-013 同源，已并入 BUG-013 的影响，不单列，故跳过 014。
@@ -348,3 +369,4 @@
 - BUG-020/021/022 为 Beta 首轮（2026-11-18）P1 对账与用户反馈产生：字段与契约不一致、检索超时预算错误、readingOrder 未实现。
 - BUG-023 为 Beta 次轮（2026-11-20）P1 复核需求卡时发现：契约 `bboxMode` 语义与 B03 验收互斥，改契约不改代码，已随 1.3.1 关闭。
 - BUG-024/025/026 为 Beta 代码审查项（2026-11-23）：拉取 `#74`/`#75` 提交后逐行核对多用户隔离，审出 explain 漏过滤、内部服务无鉴权、登录态静默回退三个漏洞。**均为审查产出，不是跑测产出**。
+- BUG-027 为同日查看 `#81`/`#87`/`#88` 时发现：`chunks.reading_order` 全仓无建列语句，代码侧探测列后静默跳过——**BUG-019 的同型复发，只是从"报错"变成"静默为空"**。
