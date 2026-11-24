@@ -57,10 +57,10 @@ const pdfDoc = shallowRef(null)
 let renderTasks = []
 
 // ===== #6 翻页 / 缩放 =====
-const ZOOM_MIN = 0.6
-const ZOOM_MAX = 2.4
-const ZOOM_STEP = 0.2
-const BASE_SCALE = 1.4 // 自适应宽度时的基准倍率
+const ZOOM_MIN = 0.5 //更改缩放倍率使与#59中的50% 100% 200%档相适应
+const ZOOM_MAX = 2.5
+const ZOOM_STEP = 0.25
+const BASE_SCALE = 1.5 // 自适应宽度时的基准倍率
 
 const scrollContainer = ref(null)
 const pageEls = new Map()
@@ -918,6 +918,22 @@ onBeforeUnmount(() => {
       <header class="qa-header">
         <h2>问答</h2>
         <p v-if="paper" class="paper-badge">{{ paper.title }}</p>
+
+        <!-- #59 引用框三态图例：线型即语义 -->
+        <div class="cite-legend" aria-label="引用框图例">
+          <span class="cite-legend-item" title="bboxMode=precise：黄色实线框，标出逐句精确范围">
+            <i class="cite-legend-swatch is-precise" aria-hidden="true"></i>
+            <span>实线：精确引用</span>
+          </span>
+          <span class="cite-legend-item" title="bboxMode=block：黄色虚线框，标出整段范围，不冒充逐句精确">
+            <i class="cite-legend-swatch is-block" aria-hidden="true"></i>
+            <span>虚线：整段范围</span>
+          </span>
+          <span class="cite-legend-item" title="bboxMode=null：没有 bbox 坐标，只跳到目标页并闪烁，不画框">
+            <i class="cite-legend-swatch is-flash" aria-hidden="true"></i>
+            <span>闪烁：仅跳页</span>
+          </span>
+        </div>
       </header>
 
       <!-- 聊天消息列表 -->
@@ -1159,7 +1175,7 @@ onBeforeUnmount(() => {
   background: rgb(59 130 246 / 30%);
 }
 
-/* ===== #41 引用 bbox 高亮层 ===== */
+/* ===== #41 / #59 引用 bbox 高亮层 ===== */
 .citation-highlight-layer {
   position: absolute;
   top: 1px;
@@ -1170,22 +1186,32 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
+/*
+ * #59 三态视觉统一：
+ *   精确（precise）= 实线框
+ *   整段（block）  = 虚线框（线型区分语义，不靠换颜色）
+ * 边框固定 2px CSS 像素、不加模糊阴影，50%/100%/200% 缩放下都不会糊；
+ * 位置仍用百分比定位，随页面缩放自动对齐。
+ */
 .citation-highlight {
+  --cite-accent: #f59e0b;
+  --cite-fill: rgb(245 158 11 / 16%);
+  --cite-ring: rgb(245 158 11 / 10%);
+
   position: absolute;
   box-sizing: border-box;
-  border: 2px solid #f59e0b;
+  border: 2px solid var(--cite-accent);
   border-radius: 3px;
-  background: rgb(245 158 11 / 18%);
-  box-shadow: 0 0 0 2px rgb(245 158 11 / 12%);
+  background: var(--cite-fill);
+  box-shadow: 0 0 0 2px var(--cite-ring);
   animation: citation-highlight-fade 2.6s ease-out forwards;
 }
 
-/* 双栏/复杂版面：bboxMode=block，用虚线提示“整段范围”，不冒充逐句精确 */
+/* 双栏/复杂版面：bboxMode=block，同色虚线提示“整段范围” */
 .citation-highlight.is-block {
-  border-color: #2563eb;
+  --cite-fill: rgb(245 158 11 / 10%);
+  --cite-ring: rgb(245 158 11 / 8%);
   border-style: dashed;
-  background: rgb(37 99 235 / 14%);
-  box-shadow: 0 0 0 2px rgb(37 99 235 / 10%);
 }
 
 @keyframes citation-highlight-fade {
@@ -1201,11 +1227,50 @@ onBeforeUnmount(() => {
   position: absolute;
   inset: 0;
   z-index: 14;
-  border: 2px solid rgb(37 99 235 / 55%);
+  border: 2px solid rgb(245 158 11 / 60%);
   border-radius: 4px;
   pointer-events: none;
   animation: page-flash-fade 1.1s ease-out forwards;
 }
+
+/* ===== #59 引用框图例 ===== */
+.cite-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.cite-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.cite-legend-swatch {
+  flex-shrink: 0;
+  width: 16px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 2px solid #f59e0b;
+  border-radius: 2px;
+  background: rgb(245 158 11 / 16%);
+}
+
+.cite-legend-swatch.is-block {
+  border-style: dashed;
+  background: rgb(245 158 11 / 10%);
+}
+
+.cite-legend-swatch.is-flash {
+  border-color: rgb(245 158 11 / 60%);
+  background: transparent;
+}
+
 
 @keyframes page-flash-fade {
   0% { opacity: 0; }
