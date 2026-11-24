@@ -1,4 +1,4 @@
-"""开发工具：验证 #40 的 bbox 产出与切片回归（Day 1）。
+"""开发工具：验证 #40 的 bbox 产出与 #82 的切片/阅读顺序基线。
 
 用法（在 ai-service 目录下）：
     .venv/Scripts/python.exe -m scripts.check_bbox
@@ -22,23 +22,28 @@ sys.path.insert(0, BASE_DIR)
 from app.services.chunker import build_chunks
 from app.services.pdf_extractor import extract_blocks
 
-# 旧实现的切片基线：chunk 数 + content 哈希，改切片逻辑后必须仍然匹配
-BASELINES = {
+# 单栏严格基线：单栏论文的切片内容必须逐字节不变
+STRICT_BASELINES = {
     "attention.pdf": (
         77,
         "2ed77607a0f370d6d8cc4e2e3130ff299cedf3fa317b3ab7752ed92d835e8ba1",
     ),
+}
+
+# 双栏预期基线：#81 按阅读顺序重排后，chunk 边界会变化；由 #82 人工抽查后冻结。
+# 换切片规则或重排规则时必须重新人工确认，不能只看哈希。
+EXPECTED_BASELINES = {
     "adaptive-rag.pdf": (
-        135,
-        "46d011b70de18680958cf49cfe28e7c4b534945a42f8ca036c5850bfd636b593",
+        133,
+        "d1f11492f83351a5ed71b663e7c1f2af764184050cdf4d414c1dd4a1cf8c90b3",
     ),
     "query-rewriting.pdf": (
-        102,
-        "8248ac32f3ff0ec01d7d6c1f5064a14339f0ca32c33439d4a56a8c1f743c7724",
+        101,
+        "475ae68d591f3d09b72f3be16b844772aa75c2d2bd75f6f9df200de1ddcf7cf9",
     ),
     "rt-detr.pdf": (
-        112,
-        "8c2dad39bf8c88493c3ed791c07d925520f5d959971cc8b5092bd892233934e2",
+        105,
+        "e00b3ff22bffd0b7ae1ec0a17ab83d8a699a2a2bc76c7d7e79f6a4ef2ee01c4f",
     ),
 }
 
@@ -65,21 +70,26 @@ def check_one(path, render=False, out_dir=None):
     print("== %s" % path)
     print("页数: %d | 文字块: %d | 切片: %d" % (page_count, len(blocks), len(chunks)))
 
-    # 1. 切片回归：文本必须与旧实现一致
-    baseline = BASELINES.get(name)
+    # 1. 切片回归：单栏必须逐字节不变；双栏基线是 #81 重排后的预期值
+    strict = STRICT_BASELINES.get(name)
+    expected = EXPECTED_BASELINES.get(name)
+    baseline = strict or expected
+
     if baseline is not None:
+        label = "单栏严格基线" if strict else "双栏预期基线"
         expected_count, expected_hash = baseline
         if len(chunks) != expected_count:
-            print("FAIL 切片数: 期望 %d，实际 %d" % (expected_count, len(chunks)))
+            print("FAIL %s 切片数: 期望 %d，实际 %d"
+                  % (label, expected_count, len(chunks)))
             failures += 1
         actual_hash = content_hash(chunks)
         if actual_hash != expected_hash:
-            print("FAIL 切片内容哈希不一致")
+            print("FAIL %s 内容哈希不一致" % label)
             print("  期望:", expected_hash)
             print("  实际:", actual_hash)
             failures += 1
         else:
-            print("PASS 切片回归（%d 片，哈希一致）" % expected_count)
+            print("PASS %s（%d 片，哈希一致）" % (label, expected_count))
 
     # 2. bbox 边界与字段一致性
     valid = 0
