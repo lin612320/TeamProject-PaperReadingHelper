@@ -1,9 +1,9 @@
 # Bug List（Alpha + Beta）
 
-> P7 李义朋 · [#25](https://github.com/lin612320/TeamProject-PaperReadingHelper/issues/25) · **v1.6 · 2026-11-23** · 测试版本 `master`（容器化）
+> P7 李义朋 · [#25](https://github.com/lin612320/TeamProject-PaperReadingHelper/issues/25) · **v1.8 · 2026-11-24** · 测试版本 `master`（容器化）
 > 版式：概览表（5 列，一屏可读）+ 每条明细分块。
-> **状态：26 条 · 已修复 18 · 不修复 1（BUG-012，接受风险）· 待修复 7**（BUG-020 契约待补、BUG-021 契约待升、BUG-022 受 BUG-027 阻塞、BUG-024/025/026 隔离漏洞、BUG-027 缺列）
-> 分区：BUG-001～019 为 Alpha 段；**BUG-020～023 为 Beta 段**（2026-11-18 起，来自 P1 契约对账与用户视角自查）；**BUG-024～027 为 Beta 代码审查项**（2026-11-23 拉取最新提交后审出）
+> **状态：28 条 · 已修复 20 · 不修复 1（BUG-012，接受风险）· 待修复 7**（BUG-020 契约待补、BUG-021 契约待升、BUG-022 受 BUG-027 阻塞、BUG-024/025/027 隔离与缺列、BUG-029 码位错配）
+> 分区：BUG-001～019 为 Alpha 段；**BUG-020～023 为 Beta 段**（2026-11-18 起，来自 P1 契约对账与用户视角自查）；**BUG-024～029 为 Beta 代码审查/实测项**（2026-11-23 起，Docker 起来后逐条实跑复核）
 
 ## 概览
 
@@ -33,10 +33,12 @@
 | BUG-023 | S2  | P1（契约）  | 已修复 | `bboxMode` 按版面类型定值，与 B03 验收互斥（文档矛盾） |
 | BUG-024 | S1  | P4        | 待修复 | `/api/explain` 不校验论文归属，跨用户读到他人标题与正文片段 |
 | BUG-025 | S1  | P6        | 待修复 | `ai-service:8000` 对外发布且 `/internal/*` 无鉴权，绕过 backend 校验 |
-| BUG-026 | S2  | P4        | 待修复 | `UserContext` 未设置时静默回退 user 1，开 enforce 后变越权 |
+| BUG-026 | S2  | P4        | 已修复 | `UserContext` 未设置时静默回退 user 1，开 enforce 后变越权 |
 | BUG-027 | S1  | P6        | 待修复 | `chunks.reading_order` 无建列语句，#81 写入永不落库 |
+| BUG-028 | S0  | P6        | 已修复 | 存量库没跑 1.1.0 迁移，`users` 表不存在，注册/登录全 500 |
+| BUG-029 | S2  | P4        | 待修复 | 数据库异常被错报成 4001 `STORAGE_ERROR`（文件存储失败） |
 
-**统计**：26 条 · 已修复 18 · 不修复 1（BUG-012，接受风险）· 待修复 7
+**统计**：28 条 · 已修复 20 · 不修复 1（BUG-012，接受风险）· 待修复 7
 
 级别：**S0** 主链断（演示走不通）· **S1** 验收不达标 · **S2** 体验或契约一致性
 （S = Severity，与分工编号 P1–P7 区分；归属列的 P3/P4 才是人）
@@ -309,6 +311,15 @@
   1. `ExplainController` 拿到 `paperId` 后先 `SELECT 1 FROM papers WHERE id = ? AND user_id = ?`，查不到直接抛 `PAPER_NOT_FOUND`（2001），再转发
   2. 或把 `userId` 一并传给 ai-service，由 `_load_context` 带 user 条件查
 - **附带**：不传 `paperId` 的划词（纯文本翻译）不受影响，**该路径不要一刀切成 401**
+- **实测确证（2026-11-24，容器内跑通）**：起 Docker 后建了一个探针账号 `probe_check_01`（id=2，名下 0 篇文献），拿它的令牌做两个对照：
+
+  | 请求 | 结果 | 是否符合契约 |
+  |---|---|---|
+  | `GET /api/papers`（用户 2） | `total=0` | ✅ 隔离生效 |
+  | `GET /api/papers/50`（用户 2 读用户 1 的论文） | **2001 / HTTP 404** | ✅ 隔离生效 |
+  | `POST /api/explain` + `paperId=50`（用户 2） | **code=0 / HTTP 200**，返回的释义里写着「在**本文语境中**，它可能作为融合地理矢量与遥感影像的特征提取或决策模型组件」 | ❌ **越权** |
+
+  第三行是关键：`id=50` 是用户 1 的《开放地理矢量与遥感影像的决策级融合……》，用户 2 名下没有任何文献，却拿到了由**别人的论文标题与正文**推出来的释义。**不是理论风险，是当场复现**。而同一批改造里 `papers` 三处都做对了，唯独 explain 漏掉——说明漏的原因是"忘了"，不是"不会"。
 - **关联**：`#75`、BUG-025
 
 ---
@@ -326,7 +337,7 @@
 
 ---
 
-### BUG-026 · `UserContext` 未设置时静默回退 user 1，登录态切换后会变成越权而非报错（S2 · P4 · 待修复）
+### BUG-026 · `UserContext` 未设置时静默回退 user 1，登录态切换后会变成越权而非报错（S2 · P4 · 已修复）
 
 - **发现**：2026-11-23 · P1 林子航 · 同上
 - **现象**：`UserContext.currentUserId()` 在 ThreadLocal 为空时**返回 `1L`**（`UserContext.java:16`），不抛异常、不打日志
@@ -337,6 +348,20 @@
   1. 回退值改成"按配置"：`enforce=false` 时回退 1（保持兼容并 WARN 一行）；`enforce=true` 时直接抛 `AUTH_TOKEN_INVALID`（6002）
   2. 白名单改用 `endsWith` 或 `AntPathMatcher`
 - **判据**：`AUTH_ENFORCE=true` 后，不带 `Authorization` 头请求 `/api/papers` 必须回 **401 / 6002**，而不是返回用户 1 的列表
+- **修复**：`134d0e3`（11-24，P4）两条都照修法做了，逐行核对如下：
+  - `UserContext.currentUserId()` 改为 ThreadLocal 为空时**抛 `BizException(AUTH_TOKEN_INVALID)`**，不再静默返回 1
+  - `JwtFilter` 在 `enforce=false` 且无令牌时**显式** `UserContext.set(1L)` 并打一条 `WARN`（日志里能看见"按 legacy 用户 1 处理"），把隐式兜底摊到明面上
+  - `shouldNotFilter` 改用 `getServletPath()` 并剥掉末尾斜杠，白名单不再被 `/api/auth/login/` 或 context-path 打穿
+- **实测核验（2026-11-24，Docker 起后补做）**：临时注入 `AUTH_ENFORCE=true` 重启 backend，逐条对判据：
+
+  | 请求 | 实测 | 契约要求 | 结论 |
+  |---|---|---|---|
+  | 无令牌 `GET /api/papers` | **6002 / HTTP 401** | 6002 / 401 | ✅ 通过 |
+  | 无令牌 `GET /api/auth/me` | **6002 / HTTP 401** | 6002 / 401 | ✅ 通过 |
+  | `POST /api/auth/login`（白名单） | 400（参数问题），**未被 401 挡** | 不应 401 | ✅ 通过 |
+  | `POST /api/auth/login/`（带尾斜杠） | 404「接口不存在」，**未被 401 挡** | 不应 401 | ✅ 通过 |
+
+  即：`AUTH_ENFORCE=true` 后，不再有任何请求会静默落到用户 1。**本单实测关闭。**（测完已把 `AUTH_ENFORCE` 恢复默认 false）
 
 ---
 
@@ -352,8 +377,57 @@
 - **修法（两处都要，缺一不可）**：
   1. `docs/契约/03-数据库表结构.sql` 的 `chunks` 建表加 `reading_order INT`（契约 01 的口径：页内从 0 起、可空）
   2. `scripts/migrate-users-1.1.0.sql`（或另起 `migrate-reading-order-1.3.0.sql`）加 `ALTER TABLE chunks ADD COLUMN IF NOT EXISTS reading_order INT;`
-- **核对不了的一步（如实记）**：本想连容器 `\d chunks` 实测确认，但本机 **Docker 引擎当时未启动**，只做了静态核对。所以此条记为「静态确证、运行环境未核验」，等 Docker 起来后补一次 `docker compose exec postgres psql -U papermind -d papermind -c "\d chunks"`
+- **实测确证（2026-11-24，容器内 `\d chunks`）**：`chunks` 现有 13 列——`id / paper_id / chunk_index / page / content / char_count / token_count / bbox_x0~y1 / embedding / created_at / bbox_mode`，**确实没有 `reading_order`**。BUG-027 由「静态推断」升级为「运行环境确证」
 - **关联**：`#81` `#87` `#88` `#82`、BUG-019、BUG-022
+
+---
+
+### BUG-028 · 存量库从未执行 1.1.0 迁移，`users` 表不存在 → 注册/登录全部 500（S0 · P6 · 已修复）
+
+- **发现**：2026-11-24 · P1 林子航 · 起 Docker 后实测 auth 链路
+- **现象**：
+  - `docker compose exec postgres psql -c "\d users"` → **`relation "users" does not exist`**
+  - `pg_constraint` 里查不到 `fk_papers_user` → 外键也没建
+  - `POST /api/auth/register` → **HTTP 500，`{"code":4001,"message":"数据库访问异常"}`**
+  - `POST /api/auth/login` → 同样 500 / 4001
+- **根因**：`docs/契约/03-数据库表结构.sql` 只挂载为 `docker-entrypoint-initdb.d/01-schema.sql`，**仅在数据目录为空时执行**；存量库（`papermind_pgdata` 卷）永远走不到。P6 另写了 `scripts/migrate-users-1.1.0.sql`，但**这个环境里没人跑过**——`#88`「存量库实测」关单了，实测的显然不是这台开发库
+- **影响**：**注册/登录完全不可用**（S0 级：Beta 出口条件「登录多用户」直接卡死）。而且前端 `#70` 路由守卫上线后会一片空白
+- **修复（2026-11-24 已执行）**：`Get-Content scripts/migrate-users-1.1.0.sql -Raw | docker compose exec -T postgres psql -U papermind -d papermind`，输出 `CREATE TABLE / INSERT 0 1 / setval 1 / UPDATE 0 / DO`，全部成功。迁移后实测：
+
+  | 步骤 | 结果 |
+  |---|---|
+  | `users` 表 | ✅ 建成，只有 `id=1 legacy`（`password_hash='!disabled'`，不可登录） |
+  | `fk_papers_user` | ✅ 外键存在（`contype=f`） |
+  | `POST /api/auth/register` | ✅ code=0，返回 token，`expiresAt=2026-11-25T07:41:35+08:00`，`user.id=2` |
+  | `GET /api/auth/me` 带令牌 | ✅ 200，返回 `id=2 / username / createdAt` |
+  | 重复注册同名 | ✅ **6003 / HTTP 400** |
+  | 正确密码登录 | ✅ 200 + token |
+  | 错误密码登录 | ✅ **6001 / HTTP 401** |
+  | 不存在用户登录 | ✅ **6001 / HTTP 401**（与密码错同一个码，防探测） |
+
+  `setval` 那步验证到位：legacy 占 id=1，新注册拿到 **id=2**，没有撞号。
+- **仍需做的事（流程，不是代码）**：
+  1. 把「存量库要单独跑迁移」写进部署手册与出口条件检查单，**新环境起完必须核一次 `\d users`**
+  2. 探针账号 `probe_check_01` 已删，`users` 里只剩 `legacy` 一行
+  3. 建议在 `StartupChecker` 里加一条：启动时若 `users` 表缺失就 WARN 打印迁移命令（跟 BUG-019 的教训一致——缺列/缺表要能自检出来）
+
+---
+
+### BUG-029 · 数据库异常被错报成 4001 `STORAGE_ERROR`（文件存储失败），文案与码位语义不符（S2 · P4 · 待修复）
+
+- **发现**：2026-11-24 · P1 林子航 · 上面那条 500 的响应
+- **现象**：`GlobalExceptionHandler.handleDb()` 把 `DataAccessException` 统一映射成 `ErrorCode.STORAGE_ERROR`，返回 **4001 /「数据库访问异常」/ HTTP 500**
+- **违约点**：契约 1.0.0 里 **4001 = `STORAGE_ERROR` =「文件存储失败」**，是给上传落盘用的。数据库异常复用它，会有两个后果：
+  1. **前端按契约做映射时会把"数据库挂了"显示成"文件存储失败"**，用户以为是自己 PDF 的问题，排查方向直接被带偏
+  2. 4001 从此一码两义，日志与告警没法区分「磁盘/卷挂了」和「SQL 报错」
+- **实测证据**：`POST /api/auth/register` 在 `users` 表缺失时返回 `{"code":4001,"message":"数据库访问异常"}` —— 一个"注册失败"却报"存储错误"
+- **修法（建议第 1 条）**：
+  1. 契约升版，新增 **`5001 DATABASE_ERROR` / HTTP 500 /「数据库访问异常」**（500 段原本只有 5000 INTERNAL，正是为此留的），实现里 `DataAccessException → 5001`
+  2. 退而求其次：复用 `5000 INTERNAL_ERROR`，但把 message 说清是数据库侧；**4001 只留给文件存储**
+- **注意**：别把这条和 BUG-020/021 那批「契约落后于实现」混在一起改，它是「实现用错码位」，改契约的同时必须改代码
+- **关联**：BUG-028（正是它暴露了这条）
+
+---
 
 ---
 
@@ -370,3 +444,4 @@
 - BUG-023 为 Beta 次轮（2026-11-20）P1 复核需求卡时发现：契约 `bboxMode` 语义与 B03 验收互斥，改契约不改代码，已随 1.3.1 关闭。
 - BUG-024/025/026 为 Beta 代码审查项（2026-11-23）：拉取 `#74`/`#75` 提交后逐行核对多用户隔离，审出 explain 漏过滤、内部服务无鉴权、登录态静默回退三个漏洞。**均为审查产出，不是跑测产出**。
 - BUG-027 为同日查看 `#81`/`#87`/`#88` 时发现：`chunks.reading_order` 全仓无建列语句，代码侧探测列后静默跳过——**BUG-019 的同型复发，只是从"报错"变成"静默为空"**。
+- BUG-028/029 为 2026-11-24 起 Docker 后实跑 auth 链路暴露：`users` 表根本没建（迁移没在本环境执行过），以及 DB 异常被映射成 4001 文件存储错误。**这两条只有真跑才会露出来，读代码读不出来**。
