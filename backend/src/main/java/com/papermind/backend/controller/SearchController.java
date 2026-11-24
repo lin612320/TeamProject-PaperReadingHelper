@@ -89,26 +89,13 @@ public class SearchController {
         } catch (IllegalArgumentException e) {
             log.error("arxiv URL 非法 keyword={}", keyword, e);
             throw new BizException(ErrorCode.INTERNAL_ERROR);
+        } catch (java.net.http.HttpTimeoutException e) {
+            log.warn("arxiv 检索超时 keyword={}", keyword, e);
+            degraded = true;
+            data.put("total", 0);
+            data.put("items", List.of());
         } catch (Exception e) {
-            // arXiv 挂了（限流 429 / 超时 / 连接失败）就回落 OpenAlex，
-            // 别让用户在检索页干等半分钟再拿到一个空列表。
-            // 注意：只对默认源（arxiv）兜底；用户显式指定 source=openalex 时它本来就是 OpenAlex。
-            if ("arxiv".equals(source)) {
-                log.warn("arxiv 不可用（{}），回落 OpenAlex keyword={}", e.toString(), keyword);
-                try {
-                    OpenAlexClient.Result fallback = openAlexClient.search(keyword.trim(), page, size);
-                    data.put("total", fallback.total);
-                    data.put("items", fallback.items);
-                    writeCache(key, fallback.total, fallback.items);
-                    data.put("degraded", false);
-                    data.put("cached", false);
-                    return ApiResponse.ok(data, "arXiv 暂时不可用，已切换到 OpenAlex");
-                } catch (Exception e2) {
-                    log.error("OpenAlex 兜底也失败 keyword={}", keyword, e2);
-                }
-            } else {
-                log.error("openalex 检索失败 keyword={}", keyword, e);
-            }
+            log.error("arxiv 检索失败 keyword={}", keyword, e);
             degraded = true;
             data.put("total", 0);
             data.put("items", List.of());
