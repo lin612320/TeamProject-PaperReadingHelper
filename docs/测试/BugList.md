@@ -1,9 +1,9 @@
 # Bug List（Alpha + Beta）
 
-> P7 李义朋 · [#25](https://github.com/lin612320/TeamProject-PaperReadingHelper/issues/25) · **v1.6 · 2026-11-23** · 测试版本 `master`（容器化）
+> P7 李义朋 · [#25](https://github.com/lin612320/TeamProject-PaperReadingHelper/issues/25) · **v1.7 · 2026-11-24** · 测试版本 `master`（容器化）
 > 版式：概览表（5 列，一屏可读）+ 每条明细分块。
-> **状态：26 条 · 已修复 18 · 不修复 1（BUG-012，接受风险）· 待修复 7**（BUG-020 契约待补、BUG-021 契约待升、BUG-022 受 BUG-027 阻塞、BUG-024/025/026 隔离漏洞、BUG-027 缺列）
-> 分区：BUG-001～019 为 Alpha 段；**BUG-020～023 为 Beta 段**（2026-11-18 起，来自 P1 契约对账与用户视角自查）；**BUG-024～027 为 Beta 代码审查项**（2026-11-23 拉取最新提交后审出）
+> **状态：26 条 · 已修复 19 · 不修复 1（BUG-012，接受风险）· 待修复 6**（BUG-020 契约待补、BUG-021 契约待升、BUG-022 受 BUG-027 阻塞、BUG-024/025 隔离漏洞、BUG-027 缺列）
+> 分区：BUG-001～019 为 Alpha 段；**BUG-020～023 为 Beta 段**（2026-11-18 起，来自 P1 契约对账与用户视角自查）；**BUG-024～027 为 Beta 代码审查项**（2026-11-23 起拉取最新提交后审出）
 
 ## 概览
 
@@ -33,10 +33,10 @@
 | BUG-023 | S2  | P1（契约）  | 已修复 | `bboxMode` 按版面类型定值，与 B03 验收互斥（文档矛盾） |
 | BUG-024 | S1  | P4        | 待修复 | `/api/explain` 不校验论文归属，跨用户读到他人标题与正文片段 |
 | BUG-025 | S1  | P6        | 待修复 | `ai-service:8000` 对外发布且 `/internal/*` 无鉴权，绕过 backend 校验 |
-| BUG-026 | S2  | P4        | 待修复 | `UserContext` 未设置时静默回退 user 1，开 enforce 后变越权 |
+| BUG-026 | S2  | P4        | 已修复 | `UserContext` 未设置时静默回退 user 1，开 enforce 后变越权 |
 | BUG-027 | S1  | P6        | 待修复 | `chunks.reading_order` 无建列语句，#81 写入永不落库 |
 
-**统计**：26 条 · 已修复 18 · 不修复 1（BUG-012，接受风险）· 待修复 7
+**统计**：26 条 · 已修复 19 · 不修复 1（BUG-012，接受风险）· 待修复 6
 
 级别：**S0** 主链断（演示走不通）· **S1** 验收不达标 · **S2** 体验或契约一致性
 （S = Severity，与分工编号 P1–P7 区分；归属列的 P3/P4 才是人）
@@ -326,7 +326,7 @@
 
 ---
 
-### BUG-026 · `UserContext` 未设置时静默回退 user 1，登录态切换后会变成越权而非报错（S2 · P4 · 待修复）
+### BUG-026 · `UserContext` 未设置时静默回退 user 1，登录态切换后会变成越权而非报错（S2 · P4 · 已修复）
 
 - **发现**：2026-11-23 · P1 林子航 · 同上
 - **现象**：`UserContext.currentUserId()` 在 ThreadLocal 为空时**返回 `1L`**（`UserContext.java:16`），不抛异常、不打日志
@@ -337,6 +337,11 @@
   1. 回退值改成"按配置"：`enforce=false` 时回退 1（保持兼容并 WARN 一行）；`enforce=true` 时直接抛 `AUTH_TOKEN_INVALID`（6002）
   2. 白名单改用 `endsWith` 或 `AntPathMatcher`
 - **判据**：`AUTH_ENFORCE=true` 后，不带 `Authorization` 头请求 `/api/papers` 必须回 **401 / 6002**，而不是返回用户 1 的列表
+- **修复**：`134d0e3`（11-24，P4）两条都照修法做了，逐行核对如下：
+  - `UserContext.currentUserId()` 改为 ThreadLocal 为空时**抛 `BizException(AUTH_TOKEN_INVALID)`**，不再静默返回 1
+  - `JwtFilter` 在 `enforce=false` 且无令牌时**显式** `UserContext.set(1L)` 并打一条 `WARN`（日志里能看见"按 legacy 用户 1 处理"），把隐式兜底摊到明面上
+  - `shouldNotFilter` 改用 `getServletPath()` 并剥掉末尾斜杠，白名单不再被 `/api/auth/login/` 或 context-path 打穿
+- **未做的一步（如实记）**：本机 Docker 引擎未启动，**没有实跑**「`AUTH_ENFORCE=true` 后无令牌请求 `/api/papers` 应回 401/6002」这条判据，只做了代码核对。Docker 起来后补一次 curl
 
 ---
 
