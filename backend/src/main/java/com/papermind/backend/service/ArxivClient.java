@@ -41,6 +41,19 @@ public class ArxivClient {
     }
 
     /**
+     * arXiv 限流（429/403）专用异常。
+     *
+     * 单独一个类型是为了两件事：
+     *   1. 不进入重试——被限流时重试只会把 30 秒预算全耗光，然后还是失败；
+     *   2. 上层能据此判断"是源在限流，不是我们的代码坏了"，直接回落 OpenAlex。
+     */
+    public static class RateLimitedException extends RuntimeException {
+        public RateLimitedException(String message) {
+            super(message);
+        }
+    }
+
+    /**
      * @param keyword    关键词（已 trim，调用方保证非空）
      * @param start      偏移量 = (page-1)*size
      * @param maxResults 本页条数（≤50）
@@ -62,7 +75,10 @@ public class ArxivClient {
 
     private byte[] fetchWithRetry(String url) throws Exception {
         int attempts = 2;
-        long perAttempt = Math.max(3, timeoutSeconds / attempts);   // 10 / 2 = 5 秒
+        // 有 OpenAlex 兜底之后，不必在 arXiv 上死等满预算：
+        // 30 秒 ÷ 2 = 15 秒/次，用户在检索页会干等 30 秒还看不到结果。
+        // 封顶 8 秒/次 → 最坏 16 秒就交给兜底，观感从"卡死"变成"稍慢"。
+        long perAttempt = Math.min(8, Math.max(3, timeoutSeconds / attempts));
         Exception last = null;
 
         for (int i = 1; i <= attempts; i++) {
@@ -75,6 +91,7 @@ public class ArxivClient {
                 last = e;
                 log.warn("arxiv 连接失败 第{}次：{}", i, e.toString());
             }
+            // RateLimitedException 是 RuntimeException，不在这里捕获 —— 限流就该立刻走兜底
         }
         throw last;   // 两次都失败 → 交给上层降级
     }
@@ -96,6 +113,10 @@ public class ArxivClient {
         HttpResponse<byte[]> response =
             client.send(request, HttpResponse.BodyHandlers.ofByteArray());
 
+        if (response.statusCode() == 429 || response.statusCode() == 403) {
+            // 限流不是"暂时性抖动"，重试没用，直接快速失败交给上层回落
+            throw new RateLimitedException("arXiv 限流，HTTP " + response.statusCode());
+        }
         if (response.statusCode() != 200) {
             throw new IllegalStateException("arXiv 返回 HTTP " + response.statusCode());
         }
