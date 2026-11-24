@@ -13,7 +13,10 @@ public final class UserContext {
 
     public static long currentUserId() {
         Long userId = CURRENT_USER.get();
-        return userId == null ? 1L : userId;
+        if (userId == null) {
+            throw new BizException(ErrorCode.AUTH_TOKEN_INVALID);
+        }
+        return userId;
     }
 
     public static void clear() {

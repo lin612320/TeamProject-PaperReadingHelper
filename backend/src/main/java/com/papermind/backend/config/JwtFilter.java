@@ -10,6 +10,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -19,6 +21,8 @@ import java.util.List;
 
 @Component
 public class JwtFilter extends OncePerRequestFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtFilter.class);
 
     private static final String HEADER = "Authorization";
     private static final String PREFIX = "Bearer ";
@@ -38,7 +42,14 @@ public class JwtFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return enforce && WHITELIST.contains(request.getRequestURI());
+        if (!enforce) {
+            return false;
+        }
+        String path = request.getServletPath();
+        if (path != null && path.length() > 1 && path.endsWith("/")) {
+            path = path.substring(0, path.length() - 1);
+        }
+        return WHITELIST.contains(path);
     }
 
     @Override
@@ -53,6 +64,10 @@ public class JwtFilter extends OncePerRequestFilter {
             } else if (enforce) {
                 write401(response);
                 return;
+            } else {
+                log.warn("未携带令牌且 enforce=false，按 legacy 用户 1 处理：{} {}",
+                    request.getMethod(), request.getRequestURI());
+                UserContext.set(1L);
             }
             chain.doFilter(request, response);
         } catch (BizException e) {
