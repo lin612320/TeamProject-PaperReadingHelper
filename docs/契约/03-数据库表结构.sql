@@ -146,6 +146,7 @@ CREATE TABLE IF NOT EXISTS chunks (
                       REFERENCES papers(id) ON DELETE CASCADE,
 
     chunk_index       INT          NOT NULL,                 -- 在本文中的顺序，从 0 开始
+    reading_order     INT,                                   -- 页内阅读顺序（#81 双栏重排），从 0 起；单栏/未重排时为空
     page              INT          NOT NULL CHECK (page >= 1), -- 所在页，**从 1 开始**
     content           TEXT         NOT NULL,                 -- 原文片段
     char_count        INT,                                   -- 字数，便于调试切片效果
@@ -186,6 +187,10 @@ COMMENT ON COLUMN chunks.embedding  IS '向量，维度必须等于 1024（与 b
 --   取值由应用层（chunker）保证，约束仅为兜底，故迁移时不搬 CHECK
 -- ────────────────────────────────────────────────────────────
 ALTER TABLE chunks ADD COLUMN IF NOT EXISTS bbox_mode TEXT;
+
+-- 存量库迁移（2026-11-25，契约 1.3.0 起 chunks.reading_order 启用，BUG-027）
+--   页内阅读顺序，双栏重排后由 P5 写入；单栏/未重排为 NULL
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS reading_order INT;
 
 -- 按论文过滤后再做向量检索，这条是必备索引
 CREATE INDEX IF NOT EXISTS idx_chunks_paper
