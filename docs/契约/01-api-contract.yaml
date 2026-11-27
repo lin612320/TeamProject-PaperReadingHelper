@@ -1,9 +1,13 @@
 openapi: 3.0.3
 info:
   title: PaperMind API
-  version: 1.3.1-frozen
+  version: 1.3.3-frozen
   description: |
-    PaperMind 论文阅读助手接口契约（**1.3.1 于 2026-11-20 冻结：修正 bboxMode 语义**；1.3.0 于 2026-11-17 由 P1 拍板冻结**；沿用 1.0.0 的做法——先冻结、在 11-19 例会向全员通报，**不等回执**。1.0.0 于 2026-10-24、1.1.0 于 2026-11-08、1.2.0 于 2026-11-10 冻结，变更须经 P1 并升版本号）。
+    PaperMind 论文阅读助手接口契约（**1.3.3 于 2026-11-27 冻结：修正超时口径，30s→25s 并写明 explain 15s**；1.3.2 于 2026-11-24 冻结：新增 5001 DATABASE_ERROR；1.3.1 于 2026-11-20 冻结：修正 bboxMode 语义；1.3.0 于 2026-11-17 由 P1 拍板冻结；沿用 1.0.0 的做法——先冻结、在例会向全员通报，**不等回执**。1.0.0 于 2026-10-24、1.1.0 于 2026-11-08、1.2.0 于 2026-11-10 冻结，变更须经 P1 并升版本号）。
+
+    **1.3.3 包含**：把 `x-conventions.timeout` 里 `qa_ask_seconds` 由 **30 改 25**（与前端 abort、后端 HttpRequest、ai-service 三段实现一致），`3002` 文案「AI 服务超时（>30s）」改为「（>25s）」，并新增 `explain_seconds: 15` 说明划词解释的前端口径。起因：测试报告发现「前端 15s / 后端 25s / 契约 >30s」三方不一致，逐处核对后确认**只有契约这句文案是错的**（BUG-031）。
+
+    **1.3.2 包含**：新增错误码 **5001 `DATABASE_ERROR`**（HTTP 500，「服务暂时不可用，请稍后重试」），并把 **4001 `STORAGE_ERROR` 收窄为只表示文件存储**。起因：数据库异常原先复用 4001，用户注册失败时会看到「文件存储失败」，语义误导且无法与磁盘故障区分（BUG-029）。
 
     **1.3.0 包含**：auth 四接口（注册 / 登录 / 当前用户 / 登出）、`chunks.reading_order` 阅读顺序、`citations[].readingOrder`、划词低质输入拦截规则、越权口径（2001），以及新增错误码段 **6001–6003**。
 
@@ -819,6 +823,31 @@ x-conventions:
           3. 新增 x-conventions.coordinate.behavior_1_3_1，behavior_1_1_0 标记为历史
           4. 前端零改动：仍按三态决定实线/虚线/只闪页，不判断单双栏
           5. Alpha 的「双栏 65/65 全 block」在旧定义下合规，不算缺陷
+      - version: 1.3.2-frozen
+        date: 2026-11-24
+        status: frozen（P1 拍板，站会通报）
+        note: |
+          **只新增一个错误码，不改字段、不改接口**（BUG-029）：
+          1. 新增 `5001 DATABASE_ERROR` / HTTP 500 /「服务暂时不可用，请稍后重试」
+          2. `4001 STORAGE_ERROR` 收窄语义：**只表示文件存储**（上传落盘、读文件失败）
+          3. 数据库异常（`DataAccessException`）一律映射到 5001，不得复用 4001
+          4. 文案面不写「数据库」——终端用户只该知道「服务暂时不可用」
+          5. 实现改动归 P4（`ErrorCode` + `GlobalExceptionHandler`），前端错误映射归 P3；P1 只改契约
+          6. 起因：`users` 表未迁移时注册失败返回 `{"code":4001,"message":"数据库访问异常"}`，
+             与 4001 的契约语义（「文件存储失败」）不符
+      - version: 1.3.3-frozen
+        date: 2026-11-27
+        status: frozen（P1 拍板，站会通报）
+        note: |
+          **只改超时口径与一句文案，不改字段、不改接口、不改错误码编号**（BUG-031）：
+          1. `x-conventions.timeout.qa_ask_seconds` **30 → 25**，与三段实现对齐：
+             前端 `papers.js` abort 25 秒、后端 `HttpRequest` 25 秒、ai-service 处理上限 25 秒
+          2. `3002 AI_SERVICE_TIMEOUT` 文案「AI 服务超时（>30s）」→「（>25s）」
+          3. 新增 `timeout.explain_seconds: 15`：划词解释是轻交互，**前端 15 秒先撤**，
+             后端仍按 25 秒上限跑；前端不得把 explain 的 15 秒 abort 当成 3002 展示
+          4. 起因：Beta 测试报告（超时专项，P7）记录「前端 15s / 后端 25s / 契约 >30s 三方不一致」；
+             逐处核对后确认**只有契约这句文案是错的**，其余是 explain 与 qa 两个不同口径被混为一谈
+          5. 实现侧不用改：前端 qa 本来就是 25 秒，后端本来就是 25 秒；本条纯契约纠错
 
   # ↓↓↓ 1.3.0 新增：三条全队约定（#51 #52 #53） ↓↓↓
   auth:
@@ -910,8 +939,16 @@ x-conventions:
     storage: 本地磁盘，路径由后端配置，不得对外暴露
 
   timeout:
-    qa_ask_seconds: 30
+    # 1.3.3 修正（BUG-031）：原来写 qa_ask_seconds: 30、文案「>30s」，
+    # 与实现不符——前端 abort、后端 HttpRequest、ai-service 三段实测都是 25 秒。
+    qa_ask_seconds: 25
+    explain_seconds: 15        # 划词解释：轻交互，前端 15 秒先撤，不等到后端的 25 秒上限
     upstream_ai_seconds: 25
+    note: |
+      三段必须一致：前端 abort 时长 = 后端 HttpRequest 超时 = ai-service 处理上限。
+      任一处更长，用户会先看到前端的超时提示而不是后端返回的 3002；任一处更短，会误杀正常请求。
+      explain 是例外：前端 15 秒先撤属于有意设计（划词等待容忍度低），后端仍按 25 秒上限跑，
+      两种超时对用户呈现不同，前端不得把 explain 的 15 秒 abort 当成 3002 展示。
 
   error_codes:
     description: 统一返回 {code, message, data}；code=0 表示成功
@@ -925,13 +962,20 @@ x-conventions:
       - { code: 2002,  http: 409, name: PAPER_NOT_READY,   message: "文献尚未解析完成，暂时无法提问" }
       - { code: 2003,  http: 422, name: EMPTY_QUESTION,    message: "问题不能为空" }
       - { code: 3001,  http: 502, name: AI_SERVICE_ERROR,  message: "AI 服务调用失败" }
-      - { code: 3002,  http: 504, name: AI_SERVICE_TIMEOUT,message: "AI 服务超时（>30s）" }
+      - { code: 3002,  http: 504, name: AI_SERVICE_TIMEOUT,message: "AI 服务超时（>25s）" }
       # ↓ 1.1.0 新增（2026-11-08）：用户自填的 API Key 无效时专用。
       #   不复用 2002（那是文献未解析完成）：Key 错却显示「文献还在解析」，用户会一直等一个永不结束的状态。
       #   不复用 3001（那是 502，语义是「我方服务故障」）：Key 错属于用户可自改的错误，应给 400。
       #   不用 401：本项目无登录态，401 会被前端通用拦截误判为「会话失效」。
       - { code: 3003,  http: 400, name: AI_SERVICE_AUTH_ERROR, message: "API Key 无效，请到设置页检查" }
       - { code: 4001,  http: 500, name: STORAGE_ERROR,     message: "文件存储失败" }
+      # ↓ 1.3.2 新增（2026-11-24）：数据库异常专用码（BUG-029）。
+      #   原先 DataAccessException 一律映射成 4001 STORAGE_ERROR，后果有两个：
+      #   ① 用户注册失败看到「文件存储失败」，会以为自己的 PDF 有问题，排查方向被带偏；
+      #   ② 4001 一码两义，日志与告警分不出「磁盘/卷挂了」与「SQL 报错」。
+      #   约定：**4001 只留给文件存储**（上传落盘、读文件失败），数据库异常一律 5001。
+      #   文案不暴露内部实现（不写「数据库」三个字给终端用户看）。
+      - { code: 5001,  http: 500, name: DATABASE_ERROR,    message: "服务暂时不可用，请稍后重试" }
       # ↓ 1.3.0 新增（2026-11-17）：auth 段。
       #   注意：**不能用 4001/4002** —— 4001 已被 STORAGE_ERROR 占用。
       #   不复用 2001：那是「文献不存在」，登录失败用它会误导前端跳转逻辑。

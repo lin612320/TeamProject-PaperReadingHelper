@@ -63,9 +63,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<ApiResponse<Void>> handleDb(DataAccessException e) {
         log.error("database error", e);
-        ErrorCode ec = ErrorCode.STORAGE_ERROR;
+        ErrorCode ec = ErrorCode.DATABASE_ERROR;
         return ResponseEntity.status(ec.getHttpStatus())
-            .body(ApiResponse.fail(ec.getCode(), "数据库访问异常"));
+            .body(ApiResponse.fail(ec.getCode(), ec.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)

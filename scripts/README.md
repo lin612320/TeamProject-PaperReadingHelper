@@ -5,6 +5,36 @@
 
 ---
 
+## start-papermind.ps1 / .cmd · 一键启动（2026-11-24 起）
+
+起 Docker、等容器 healthy、自检数据库与接口，一条命令走完。**入口只有一份，在仓库里**；桌面上的 `start-papermind.cmd` 是转发到这里的薄壳。
+
+```powershell
+cd PaperMind
+
+.\scripts\start-papermind.cmd              # 默认：起服务 + 自检
+.\scripts\start-papermind.cmd -Build       # 代码改了才需要，重建镜像（2-5 分钟）
+.\scripts\start-papermind.cmd -Status      # 只看状态，不动容器
+.\scripts\start-papermind.cmd -Down        # 停容器，数据卷保留
+.\scripts\start-papermind.cmd -Logs        # 跟后端日志，Ctrl+C 退出不影响容器
+```
+
+它做的五件事，失败时都会停在那一步并给出下一步提示：
+
+| 步骤 | 做什么 | 为什么要有 |
+|---|---|---|
+| 1 | Docker Desktop 没跑就拉起来，轮询等引擎就绪（默认最多 300s） | 手动点图标再等，每天浪费一分钟 |
+| 2 | `docker compose up -d`（`-Build` 时加 `--build`） | 统一入口，避免有人用 `run` 绕开健康检查 |
+| 3 | 等 5 个容器全部 healthy | `Up` 不等于能用，模型没加载完问答会 3001 |
+| 4 | 自检 `users` 表，缺了自动补跑 `migrate-users-1.1.0.sql` | **BUG-028 的教训**：`03-数据库表结构.sql` 只在空数据目录时执行，存量库永远缺表，注册/登录会 500 |
+| 5 | 探活 8081 / 8080 / 8000 | 起来但接口 500 的情况比你想的多 |
+
+参数：`-Repo <path>`（默认取脚本上级目录）、`-TimeoutSeconds <n>`（默认 300）。
+
+> 历史坑：这个脚本原先只存在于桌面、没进 git，某次清理被删掉后桌面 `.cmd` 成了死链，谁都没发现。所以现在真身放进 `scripts/`，桌面只留薄壳。
+
+---
+
 ## burndown.ps1 · 燃尽图自动统计
 
 统计 GitHub 仓库的未关闭 Issue 数，写入 `docs/燃尽图/燃尽图模板.csv`，并算出当日完成数与偏差。

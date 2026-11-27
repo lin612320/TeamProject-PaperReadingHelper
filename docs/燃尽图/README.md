@@ -1,4 +1,4 @@
-# 燃尽图操作手册
+﻿# 燃尽图操作手册
 
 > 用途：满足 Scrum Meeting 博客的强制项（需求分析 PPT 第 3 页第 ②条）。
 > 负责人：**P7**（每日记录）· 审核：**P1**
@@ -148,7 +148,7 @@ cd PaperMind
 
 ``powershell
 cd PaperMind
-.\scripts\burndown.ps1 -Csv docs\燃尽图\燃尽图-Beta模板.csv -Remaining 38 -Total 51   # 1. 记数（Beta）
+.\scripts\burndown.ps1 -Csv docs\燃尽图\燃尽图-Beta模板.csv -Remaining 30 -Total 51   # 1. 记数（Beta）
 .\scripts\burndown-chart.ps1 -Csv docs\燃尽图\燃尽图-Beta模板.csv `
     -Out docs\燃尽图\燃尽图-Beta-当前.png -Title "Beta 冲刺燃尽图（11-18 → 12-11 · 51 条）" -MarkLabel ""
 git add docs/燃尽图; git commit -m "chore: 更新燃尽图 (#3)"; git push

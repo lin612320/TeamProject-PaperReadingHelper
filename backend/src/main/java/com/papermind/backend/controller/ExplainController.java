@@ -3,6 +3,9 @@ package com.papermind.backend.controller;
 import com.papermind.backend.common.ApiResponse;
 import com.papermind.backend.common.BizException;
 import com.papermind.backend.common.ErrorCode;
+import com.papermind.backend.common.UserContext;
+import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,6 +33,12 @@ public class ExplainController {
     private static final int MAX_TEXT = 1000;
 
     private static final int MAX_CONTEXT = 600;
+
+    private final JdbcTemplate jdbcTemplate;
+
+    public ExplainController(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
 
     @Value("${app.ai-service.url:http://localhost:8000}")
     private String aiServiceUrl;
@@ -65,11 +74,24 @@ public class ExplainController {
 
         Object paperIdRaw = body.get("paperId");
         if (paperIdRaw != null && !String.valueOf(paperIdRaw).trim().isEmpty()) {
+            long paperId;
             try {
-                req.put("paperId", Long.parseLong(String.valueOf(paperIdRaw).trim()));
+                paperId = Long.parseLong(String.valueOf(paperIdRaw).trim());
             } catch (NumberFormatException e) {
                 throw new BizException(ErrorCode.INVALID_PARAM, "paperId 必须是数字");
             }
+
+            // BUG-024：传了 paperId 就必须属于当前用户，否则按「不存在」处理
+            // 契约 x-conventions.authz：越权一律 2001 + HTTP 404，响应不得带他人任何字段
+            try {
+                jdbcTemplate.queryForObject(
+                    "SELECT 1 FROM papers WHERE id = ? AND user_id = ?",
+                    Integer.class, paperId, UserContext.currentUserId());
+            } catch (EmptyResultDataAccessException e) {
+                throw new BizException(ErrorCode.PAPER_NOT_FOUND);
+            }
+
+            req.put("paperId", paperId);
         }
 
         String context = text(body.get("context"));

@@ -15,6 +15,7 @@ public enum ErrorCode {
     AI_SERVICE_AUTH_ERROR(3003, 400, "API Key 无效，请到设置页检查"),
     STORAGE_ERROR(4001, 500, "文件存储失败"),
     INTERNAL_ERROR(5000, 500, "服务器内部错误"),
+    DATABASE_ERROR(5001, 500, "服务暂时不可用，请稍后重试"),
     AUTH_INVALID_CREDENTIALS(6001, 401, "用户名或密码不正确"),
     AUTH_TOKEN_INVALID(6002, 401, "登录已失效，请重新登录"),
     AUTH_USERNAME_TAKEN(6003, 400, "该用户名已被占用");
