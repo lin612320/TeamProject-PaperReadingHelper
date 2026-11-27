@@ -1,4 +1,4 @@
-# Bug List（Alpha + Beta）
+﻿# Bug List（Alpha + Beta）
 
 > P7 李义朋 · [#25](https://github.com/lin612320/TeamProject-PaperReadingHelper/issues/25) · **v1.11 · 2026-11-27** · 测试版本 `master`（容器化）
 > 版式：概览表（5 列，一屏可读）+ 每条明细分块。
@@ -32,7 +32,7 @@
 | BUG-022 | S2  | P5        | 已修复 | `citations` 缺 `readingOrder`（契约 1.3.0 已冻结） |
 | BUG-023 | S2  | P1（契约）  | 已修复 | `bboxMode` 按版面类型定值，与 B03 验收互斥（文档矛盾） |
 | BUG-024 | S1  | P4        | 已修复 | `/api/explain` 不校验论文归属，跨用户读到他人标题与正文片段 |
-| BUG-025 | S1  | P6        | 待修复 | `ai-service:8000` 对外发布且 `/internal/*` 无鉴权，绕过 backend 校验 |
+| BUG-025 | S1  | P6        | 待修复（归属已定，删端口发布） | `ai-service:8000` 对外发布且 `/internal/*` 无鉴权，绕过 backend 校验 |
 | BUG-026 | S2  | P4        | 已修复 | `UserContext` 未设置时静默回退 user 1，开 enforce 后变越权 |
 | BUG-027 | S1  | P6        | 已修复 | `chunks.reading_order` 无建列语句，#81 写入永不落库 |
 | BUG-028 | S0  | P6        | 已修复 | 存量库没跑 1.1.0 迁移，`users` 表不存在，注册/登录全 500 |
@@ -340,6 +340,11 @@
   1. 去掉 `8000:8000` 发布，只让 compose 网络内可达（backend 走 `http://ai-service:8000` 不受影响）；调试需要时临时 `docker compose port`
   2. 或内部加共享令牌：compose 注入 `INTERNAL_TOKEN`，两边比对，缺失/不符回 3003
 - **顺带**：若保留发布，至少在 `docs/部署` 里写明"8000 不得暴露到公网"
+- **✅ 归属已定（2026-11-27 B10 站会后，P1 裁定）**：**归 P6 刘征，按方案 1 执行**——删掉 `docker-compose.yml` 的 `ports: - "8000:8000"`。
+  - **为什么是 P6 不是 P4**：「端口要不要对外发布」是部署编排问题，后端与 AI 服务代码一行都不用改；只有方案 2（内部令牌）才牵涉 P4，那是更重的选项，不符合"一行配置换掉一个 S1"的性价比
+  - **为什么是方案 1 不是方案 2**：后端本来就通过容器网络 `http://ai-service:8000` 调用，删掉宿主机映射对外零影响；调试需要时 `docker compose exec ai-service curl localhost:8000/internal/health` 一样能测
+  - **为什么不能再拖**：这是唯一还开着的 S1，也是唯一"一行配置就能关掉"的出口条件阻塞项
+  - **验收判据（P6 改完自己跑）**：`docker ps` 里 `papermind-ai` 的 PORTS 只剩 `8000/tcp`（不带 `0.0.0.0:`）；宿主机 `curl http://localhost:8000/internal/health` 应**连不通**，而 `curl http://localhost:8080/api/papers` 仍 200
 
 ---
 
