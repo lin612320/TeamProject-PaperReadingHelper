@@ -97,8 +97,8 @@ services:
       # 容器内直连 huggingface.co 会被墙（实测 Errno 101 Network is unreachable），
       # 模型下载走国内镜像；需要官方源时在 .env 里覆盖 HF_ENDPOINT
       HF_ENDPOINT: ${HF_ENDPOINT:-https://hf-mirror.com}
-    ports:
-      - "8000:8000"
+    # 不对外暴露端口（BUG-025）：ai-service 只被 backend 内网调用（http://ai-service:8000）。
+    # 之前 - "8000:8000" 会把 8000 映射到宿主机，外部能绕过 backend 直接调 AI 服务。
     volumes:
       - hf-cache:/root/.cache/huggingface
       # 与 backend 共用同一个上传卷：P5 要按 backend 传来的路径读 PDF。
