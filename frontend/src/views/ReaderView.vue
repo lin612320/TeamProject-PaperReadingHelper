@@ -56,6 +56,144 @@ const scale = ref(1.4)
 const pdfDoc = shallowRef(null)
 let renderTasks = []
 
+// ===== #60 渲染调度 =====
+let renderEpoch = 0
+let zoomDebounceTimer = 0
+let pendingZoomDelta = 0
+let lazyRenderTimer = 0
+const bitmapScale = new Map()
+const pageRenderedScale = new Map()
+const pageTextLayerScale = new Map()
+const renderingPages = new Set()
+
+function cancelRenderTasks() {
+  renderTasks.forEach((task) => {
+    try {
+      task.cancel()
+    } catch {
+      // 任务可能已结束，忽略
+    }
+  })
+  renderTasks = []
+}
+
+function markPageRendered(pageNumber) {
+  pageRenderedScale.set(pageNumber, scale.value)
+  bitmapScale.set(pageNumber, scale.value)
+  if (pageNumber > renderedPages.value) renderedPages.value = pageNumber
+}
+
+function isPageStale(pageNumber) {
+  return pageRenderedScale.get(pageNumber) !== scale.value
+}
+
+/** 缩放时先撑开未重绘页的显示尺寸：布局立刻正确，旧位图当临时预览 */
+function applyStaleLayout(nextScale) {
+  canvasEls.forEach((canvas, pageNumber) => {
+    if (!canvas || !canvas.width) return
+    const from = bitmapScale.get(pageNumber) || scale.value
+    const ratio = nextScale / from
+    canvas.style.width = `${Math.round(canvas.width * ratio)}px`
+    canvas.style.height = `${Math.round(canvas.height * ratio)}px`
+  })
+}
+
+function clearStaleLayout(canvas) {
+  if (!canvas) return
+  canvas.style.width = ''
+  canvas.style.height = ''
+}
+
+function clearTextLayers() {
+  textLayerTasks.forEach((t) => {
+    try {
+      t.cancel?.()
+    } catch {
+    }
+  })
+  textLayerTasks.clear()
+  textLayerEls.forEach((el) => {
+    if (el) el.textContent = ''
+  })
+  pageTextLayerScale.clear()
+}
+
+/** 渲染单页：缩放后只画当前页，滚动后补画可视页 */
+async function renderPage(pageNumber, epoch = renderEpoch) {
+  const canvas = canvasEls.get(pageNumber)
+  if (!pdfDoc.value || !canvas) return false
+  // 同一张 canvas 不能并发 render，否则 pdf.js 会抛错
+  if (renderingPages.has(pageNumber)) return false
+  renderingPages.add(pageNumber)
+
+  try {
+    const page = await pdfDoc.value.getPage(pageNumber)
+    if (epoch !== renderEpoch) return false
+
+    const viewport = page.getViewport({ scale: scale.value })
+    canvas.width = Math.floor(viewport.width)
+    canvas.height = Math.floor(viewport.height)
+    clearStaleLayout(canvas)
+
+    const task = page.render({
+      canvas,
+      canvasContext: canvas.getContext('2d'),
+      viewport,
+    })
+    renderTasks.push(task)
+    await task.promise
+    if (epoch !== renderEpoch) return false
+
+    markPageRendered(pageNumber)
+    return true
+  } finally {
+    renderingPages.delete(pageNumber)
+  }
+}
+
+async function ensureTextLayer(pageNumber, epoch = renderEpoch) {
+  const textLayerEl = textLayerEls.get(pageNumber)
+  const canvas = canvasEls.get(pageNumber)
+  if (!pdfDoc.value || !textLayerEl || !canvas) return
+  if (pageTextLayerScale.get(pageNumber) === scale.value) return
+
+  const prev = textLayerTasks.get(pageNumber)
+  if (prev) {
+    try {
+      prev.cancel?.()
+    } catch {
+      // 忽略
+    }
+    textLayerTasks.delete(pageNumber)
+  }
+
+  const page = await pdfDoc.value.getPage(pageNumber)
+  if (epoch !== renderEpoch) return
+  const viewport = page.getViewport({ scale: scale.value })
+  const textContent = await page.getTextContent()
+  if (epoch !== renderEpoch) return
+
+  textLayerEl.textContent = ''
+
+  const textLayer = new pdfjsLib.TextLayer({
+    textContentSource: textContent,
+    container: textLayerEl,
+    viewport,
+  })
+  textLayerTasks.set(pageNumber, textLayer)
+  await textLayer.render()
+  if (epoch !== renderEpoch) return
+  pageTextLayerScale.set(pageNumber, scale.value)
+
+  // canvas 可能被 max-width:100% 缩放，让 text layer 跟随显示尺寸
+  const { pageWidth } = viewport.rawDims
+  requestAnimationFrame(() => {
+    // 用 clientWidth（不含 border），避免边框导致的偏移
+    const displayScale = canvas.clientWidth / pageWidth
+    textLayerEl.style.setProperty('--total-scale-factor', displayScale)
+  })
+}
+
 // ===== #6 翻页 / 缩放 =====
 const ZOOM_MIN = 0.5 //更改缩放倍率使与#59中的50% 100% 200%档相适应
 const ZOOM_MAX = 2.5
@@ -117,26 +255,22 @@ async function openDocument() {
 async function renderAllPages({ resetProgress = true } = {}) {
   if (!pdfDoc.value) return
 
+  // 开启新代次，并把上一轮（可能是缩放触发的）任务全部取消
+  const epoch = ++renderEpoch
+  cancelRenderTasks()
+
   pdfLoading.value = true
   pdfErrorMessage.value = ''
   // 缩放重绘时不重置，避免整片画布闪白
   if (resetProgress) renderedPages.value = 0
-
-  // 重渲染前清除旧 text layer 任务和内容
-  textLayerTasks.forEach((t) => {
-    try {
-      t.cancel?.()
-    } catch {
-      // 忽略
-    }
-  })
-  textLayerTasks.clear()
-  textLayerEls.forEach((el) => {
-    if (el) el.textContent = ''
-  })
+  pageRenderedScale.clear()
+  clearTextLayers()
 
   try {
     for (let pageNumber = 1; pageNumber <= pdfDoc.value.numPages; pageNumber++) {
+      // A：被新的渲染接管时立刻退出，不和新任务抢主线程
+      if (epoch !== renderEpoch) return
+
       const canvas = canvasEls.get(pageNumber)
       if (!canvas) {
         console.warn(`第 ${pageNumber} 页的 canvas 还没挂载，已跳过`)
@@ -144,52 +278,51 @@ async function renderAllPages({ resetProgress = true } = {}) {
       }
 
       const page = await pdfDoc.value.getPage(pageNumber)
+      if (epoch !== renderEpoch) return
+
       const viewport = page.getViewport({ scale: scale.value })
       const context = canvas.getContext('2d')
       canvas.width = Math.floor(viewport.width)
       canvas.height = Math.floor(viewport.height)
+      clearStaleLayout(canvas)
 
       const task = page.render({ canvas, canvasContext: context, viewport })
       renderTasks.push(task)
       await task.promise
+      if (epoch !== renderEpoch) return
+
+      markPageRendered(pageNumber)
       renderedPages.value = pageNumber
-
-      // 渲染 text layer，让文字可选中
-      const textLayerEl = textLayerEls.get(pageNumber)
-      if (textLayerEl) {
-        const textContent = await page.getTextContent()
-        const textLayer = new pdfjsLib.TextLayer({
-          textContentSource: textContent,
-          container: textLayerEl,
-          viewport,
-        })
-        textLayerTasks.set(pageNumber, textLayer)
-        await textLayer.render()
-
-        // canvas 可能被 max-width:100% 缩放，让 text layer 跟随显示尺寸
-        // 通过设置 --total-scale-factor 让 pdfjs 自己计算容器尺寸和字体大小
-        const { pageWidth } = viewport.rawDims
-        requestAnimationFrame(() => {
-          // 用 clientWidth（不含 border），避免边框导致的偏移
-          const displayScale = canvas.clientWidth / pageWidth
-          textLayerEl.style.setProperty('--total-scale-factor', displayScale)
-        })
-      }
     }
+
+    // 文字层只给当前页补，其余页等滚过去再补
+    ensureTextLayer(currentPage.value, epoch)
   } catch (error) {
+    if (epoch !== renderEpoch) return
     const friendly = formatPdfError(error)
     if (friendly) pdfErrorMessage.value = friendly
   } finally {
-    pdfLoading.value = false
+    // A：只在仍是当前代次时收尾，避免把新任务的 loading 关掉
+    if (epoch === renderEpoch) pdfLoading.value = false
   }
 }
 
 async function loadDocument() {
+  // 切换文档时作废一切在跑的渲染任务
+  renderEpoch += 1
+  cancelRenderTasks()
+  clearTimeout(zoomDebounceTimer)
+  clearTimeout(lazyRenderTimer)
+  pendingZoomDelta = 0
+
   pdfLoading.value = true
   pdfErrorMessage.value = ''
   usingSample.value = false
   pageCount.value = 0
   renderedPages.value = 0
+  pageRenderedScale.clear()
+  bitmapScale.clear()
+  clearTextLayers()
   currentPage.value = 1
   pageInput.value = 1
   clearCitationHighlight()
@@ -238,7 +371,31 @@ function handleScroll() {
   scrollRafId = requestAnimationFrame(() => {
     scrollRafId = 0
     updateCurrentPage()
+    scheduleVisibleRender()
   })
+}
+
+// 滚动停止后再补画，避免滚动过程中每帧都触发重绘
+function scheduleVisibleRender() {
+  clearTimeout(lazyRenderTimer)
+  lazyRenderTimer = setTimeout(renderVisiblePages, 120)
+}
+
+async function renderVisiblePages() {
+  if (!pdfDoc.value || pdfLoading.value || zooming.value || !pageCount.value) return
+
+  const epoch = renderEpoch
+  // 当前页 ±1，滚动时能提前看到相邻页
+  const targets = [currentPage.value - 1, currentPage.value, currentPage.value + 1]
+
+  for (const pageNumber of targets) {
+    if (epoch !== renderEpoch) return
+    if (pageNumber < 1 || pageNumber > pageCount.value) continue
+    if (isPageStale(pageNumber)) {
+      await renderPage(pageNumber, epoch)
+    }
+    await ensureTextLayer(pageNumber, epoch)
+  }
 }
 
 // 滚动到指定页，页码会被夹到 1..pageCount
@@ -335,6 +492,12 @@ function jumpToCitation(cite) {
 
   const target = Math.floor(Number(cite.page))
   goToPage(target)
+
+  // #60：目标页可能因缩放处于待重绘状态，跳页后立刻补画
+  if (!pdfLoading.value && !zooming.value) {
+    renderPage(target)
+  }
+
   clearCitationHighlight()
 
    const style = citationBoxStyle(cite)
@@ -378,8 +541,19 @@ function restoreAnchor(container, anchor) {
   container.scrollTop = Math.max(0, pageOffsetTop(el, container) + anchor.ratio * (el.offsetHeight || 1))
 }
 
-async function changeZoom(delta) {
-  if (pdfLoading.value || zooming.value || !pdfDoc.value) return
+// 连续点击合并成一次缩放，避免每点一下就全量重绘
+function changeZoom(delta) {
+  if (pdfLoading.value || !pdfDoc.value) return
+
+  pendingZoomDelta = Math.round((pendingZoomDelta + delta) * 100) / 100
+  clearTimeout(zoomDebounceTimer)
+  zoomDebounceTimer = setTimeout(flushZoom, 180)
+}
+
+async function flushZoom() {
+  const delta = pendingZoomDelta
+  pendingZoomDelta = 0
+  if (!delta || pdfLoading.value || !pdfDoc.value) return
 
   const next = Math.min(
     ZOOM_MAX,
@@ -390,15 +564,30 @@ async function changeZoom(delta) {
   const container = scrollContainer.value
   const anchor = captureAnchor(container)
 
+  const epoch = ++renderEpoch
+  cancelRenderTasks()
+
   zooming.value = true
   scale.value = next
+  pageRenderedScale.clear()
+  clearTextLayers()
+  // 其余页先把显示尺寸撑到新比例，布局与滚动位置不跳，旧位图当临时预览
+  applyStaleLayout(next)
+
   try {
-    await renderAllPages({ resetProgress: false })
+    await renderPage(currentPage.value, epoch)
     await nextTick()
     restoreAnchor(container, anchor)
     updateCurrentPage()
+    // 当前页文字层延后补
+    ensureTextLayer(currentPage.value, epoch)
+  } catch (error) {
+    if (epoch === renderEpoch) {
+      const friendly = formatPdfError(error)
+      if (friendly) pdfErrorMessage.value = friendly
+    }
   } finally {
-    zooming.value = false
+    if (epoch === renderEpoch) zooming.value = false
   }
 }
 
@@ -705,6 +894,9 @@ onBeforeUnmount(() => {
     scrollRafId = 0
   }
   clearTimeout(flashTimer)
+  clearTimeout(zoomDebounceTimer)
+  clearTimeout(lazyRenderTimer)
+  pendingZoomDelta = 0
   clearCitationHighlight()
   renderTasks.forEach((task) => {
     try {
