@@ -14,11 +14,13 @@ MAX_TOTAL_SECONDS = 24          # 契约上限 25 秒，留 1 秒余量
 # #84 概览类问题：放宽召回，并保证摘要/首段/末段进入上下文
 OVERVIEW_TOP_K = 8
 OVERVIEW_ANCHOR_LIMIT = 2
+OVERVIEW_CONCLUSION_LIMIT = 2
 
 OVERVIEW_ZH_PATTERNS = (
     "讲了什么", "讲了啥", "讲的是什么", "主要讲", "主要内容", "概括",
     "总结", "概述", "简介", "贡献", "创新点", "解决什么问题",
-    "解决了什么", "解决的问题", "研究问题", "用了什么数据",
+    "解决了什么", "解决的问题", "研究问题", "研究什么问题",
+    "主要研究什么", "研究目标", "核心问题", "用了什么数据",
     "什么数据集", "结论",
 )
 
@@ -132,21 +134,65 @@ def _fetch_anchor_chunks(paper_id, limit=OVERVIEW_ANCHOR_LIMIT):
     return first, abstract, last
 
 
+def is_conclusion_question(question):
+    """概览题中要求依据论文结论作答的子类。"""
+    text = (question or "").strip().lower()
+    return any(pattern in text for pattern in ("结论", "conclusion", "key findings"))
+
+
+def _fetch_conclusion_chunks(paper_id, limit=OVERVIEW_CONCLUSION_LIMIT):
+    """取论文中标题或正文明确包含 Conclusion/结论 的片段，供结论题锚定。"""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            order_expr = _reading_order_expr(cur)
+            cur.execute(
+                "select id, chunk_index, page, content, "
+                "bbox_x0, bbox_y0, bbox_x1, bbox_y1, bbox_mode, "
+                + order_expr + " as reading_order, 0.0 as similarity "
+                "from chunks where paper_id = %s "
+                "and (content ilike %s or content ilike %s or content ilike %s) "
+                "order by chunk_index asc limit %s",
+                (paper_id, "%conclusion%", "%concluding remarks%", "%结论%", limit),
+            )
+            return [_row_to_chunk(row) for row in cur.fetchall()]
+
+
 def search_overview_chunks(paper_id, question, top_k=OVERVIEW_TOP_K):
-    """概览题：dense top_k + 首段/摘要/末段，去重后优先保留固定上下文。"""
+    """概览题：优先保留结构锚点，同时为引用保留 dense 相关度排序。"""
     dense = search_chunks(paper_id, question, top_k)
     first, abstract, last = _fetch_anchor_chunks(paper_id)
+    conclusion = (
+        _fetch_conclusion_chunks(paper_id)
+        if is_conclusion_question(question) else []
+    )
 
     merged = []
-    seen = set()
-    for chunk in first + abstract + last + dense:
-        chunk_id = chunk["chunk_id"]
-        if chunk_id in seen:
-            continue
-        seen.add(chunk_id)
-        merged.append(chunk)
-        if len(merged) >= top_k:
-            break
+    by_id = {}
+    groups = (
+        (first, 0),
+        (abstract, 0),
+        (conclusion, 2),
+        (last, 0),
+        (dense, 1),
+    )
+    for group, citation_priority in groups:
+        for chunk in group:
+            chunk_id = chunk["chunk_id"]
+            existing = by_id.get(chunk_id)
+            if existing is not None:
+                existing["similarity"] = max(
+                    existing["similarity"], chunk["similarity"]
+                )
+                existing["_citation_priority"] = max(
+                    existing["_citation_priority"], citation_priority
+                )
+                continue
+
+            chunk["_citation_priority"] = citation_priority
+            by_id[chunk_id] = chunk
+            merged.append(chunk)
+            if len(merged) >= top_k:
+                return merged
     return merged
 
 
@@ -185,7 +231,15 @@ def build_prompt(question, chunks, overview=False):
 
 def _build_citations(chunks, max_citations):
     citations = []
-    for chunk in chunks[:max_citations]:
+    citation_chunks = sorted(
+        chunks,
+        key=lambda chunk: (
+            chunk.get("_citation_priority", 0),
+            chunk.get("similarity", 0.0),
+        ),
+        reverse=True,
+    )
+    for chunk in citation_chunks[:max_citations]:
         snippet = chunk["content"].strip()
         if len(snippet) > 200:
             snippet = snippet[:200]

@@ -1,0 +1,935 @@
+{
+  "baseUrl": "http://127.0.0.1:8001",
+  "gitCommit": "cf39624",
+  "label": "beta85",
+  "papers": {
+    "A": {
+      "title": "Adaptive-RAG: Learning to Adapt Retrieval-Augmented Large Language Models through Question Complexity",
+      "source": "arXiv 2403.14403v2（NAACL 2024）",
+      "path": "ai-service/data/baseline/adaptive-rag/adaptive-rag.pdf",
+      "sha256": "12d262c682626c26a98bdafc7ec5dc6af3fae8247d26d4f2c712b1599dafce62",
+      "paperId": 3,
+      "chunkCount": 133
+    },
+    "B": {
+      "title": "Query Rewriting for Retrieval-Augmented Large Language Models",
+      "source": "arXiv 2305.14283v3（EMNLP 2023）",
+      "path": "ai-service/data/baseline/query-rewriting/query-rewriting.pdf",
+      "sha256": "483472d9ccc633fe649a87f2224a09c717fcfe052c2914c50f8abce5f34dca84",
+      "paperId": 4,
+      "chunkCount": 101
+    },
+    "C": {
+      "title": "DETRs Beat YOLOs on Real-time Object Detection",
+      "source": "arXiv 2304.08069v3（CVPR 2024）",
+      "path": "ai-service/data/baseline/rt-detr/rt-detr.pdf",
+      "sha256": "01018b33f15723f057b1b65c4ae6958e8cc99b75acf1ca434467c9f5f0782f15",
+      "paperId": 5,
+      "chunkCount": 105
+    }
+  },
+  "date": "2026-11-28",
+  "baseline": {
+    "overview": "改动前无 O1-O5 同题前测；Alpha 原 B3 曾出现概括题拒答，不折算为 0/5。",
+    "alpha": {
+      "hits": 9,
+      "total": 10,
+      "source": "docs/alpha/测试/F3抽样结果-2026-11-05-3papers.md"
+    },
+    "negative": {
+      "passed": 3,
+      "total": 3,
+      "source": "docs/alpha/测试/F3抽样结果-2026-11-05-3papers.md"
+    }
+  },
+  "groups": {
+    "overview": {
+      "hitsAuto": 3,
+      "total": 5,
+      "required": 4,
+      "autoThresholdMet": false,
+      "manualReviewPending": true
+    },
+    "alpha": {
+      "hitsAuto": 8,
+      "total": 10,
+      "required": 9,
+      "autoThresholdMet": false,
+      "manualReviewPending": true
+    },
+    "negative": {
+      "passed": 3,
+      "total": 3,
+      "required": 3
+    }
+  },
+  "overviewResults": [
+    {
+      "id": "O1",
+      "difficulty": "概览",
+      "paper": "A",
+      "question": "这篇论文主要研究什么问题，作者提出了什么总体思路？",
+      "standardPages": [
+        1
+      ],
+      "status": 200,
+      "answer": "本文未涉及该内容",
+      "returnedPages": [],
+      "pageHit": false,
+      "snippetMatch": false,
+      "answered": false,
+      "autoHit": false,
+      "manualFabricated": null,
+      "manualHit": null,
+      "elapsedMs": 712,
+      "citations": []
+    },
+    {
+      "id": "O3",
+      "difficulty": "概览",
+      "paper": "A",
+      "question": "Adaptive-RAG 的主要贡献是什么？",
+      "standardPages": [
+        1
+      ],
+      "status": 200,
+      "answer": "1) 论文主题是提出Adaptive-RAG，解决现有检索增强大语言模型方法对简单查询产生不必要计算开销、对复杂多步查询处理不足，且用户请求并非只属于简单或复杂一类的问题；2) 主要贡献是提出一种自适应QA框架，能根据查询复杂度动态选择最合适的检索增强策略，涵盖非检索、单步和多步方法，核心在于判断给定查询的复杂度；3) 使用从单跳到多跳的开放域QA基准数据集，并在GPT-3.5和FLAN-T5系列等多个LLM上验证；4) 结论是Adaptive-RAG在多个LLM上相比先前自适应策略显著提升整体准确率和效率，并能持续平衡效率与准确率。",
+      "returnedPages": [
+        1,
+        1,
+        15
+      ],
+      "pageHit": true,
+      "snippetMatch": true,
+      "answered": true,
+      "autoHit": true,
+      "manualFabricated": null,
+      "manualHit": null,
+      "elapsedMs": 1930,
+      "citations": [
+        {
+          "page": 1,
+          "snippet": "Adaptive-RAG: Learning to Adapt Retrieval-Augmented\n\nLarge Language Models through Question Complexity\n\nSoyeong Jeong1\nJinheon Baek2\nSukmin Cho1\nSung Ju Hwang1,2\nJong C. Park1*\nSchool of Computing1\nGr",
+          "chunkId": 213,
+          "bboxX0": 0.123586,
+          "bboxY0": 0.094849,
+          "bboxX1": 0.880597,
+          "bboxY1": 0.277191,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 1,
+          "snippet": "Science and Technology1,2\n\n{starsuzi,jinheon.baek,nelllpic,sjhwang82,jongpark}@kaist.ac.kr\n\nAbstract\n\nRetrieval-Augmented Large Language Models\n(LLMs), which incorporate the non-parametric\nknowledge f",
+          "chunkId": 214,
+          "bboxX0": 0.147066,
+          "bboxY0": 0.187529,
+          "bboxX1": 0.818825,
+          "bboxY1": 0.798984,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 15,
+          "snippet": "ti-step Approach\n23.00\n32.50\n31.60\n3.41\n3.61\n45.80\n58.36\n52.20\n2.73\n3.18\n52.20\n66.08\n62.40\n3.36\n3.35\n\nOracle\nAdaptive-RAG w/ Oracle\n29.60\n44.70\n35.60\n0.90\n1.45\n55.60\n69.90\n62.80\n0.54\n1.08\n52.20\n69.90\n",
+          "chunkId": 344,
+          "bboxX0": 0.191035,
+          "bboxY0": 0.489843,
+          "bboxX1": 0.870107,
+          "bboxY1": 0.507365,
+          "bboxMode": "block",
+          "readingOrder": null
+        }
+      ]
+    },
+    {
+      "id": "O2",
+      "difficulty": "概览",
+      "paper": "B",
+      "question": "这篇论文指出传统检索增强问答的什么问题，并提出了什么框架？",
+      "standardPages": [
+        1,
+        2
+      ],
+      "status": 200,
+      "answer": "这篇论文指出传统检索增强问答（retrieve-then-read）中，输入文本与检索所需知识之间存在不可避免的差距（gap），且以往研究只关注适配检索器或阅读器。为此提出了Rewrite-Retrieve-Read新框架，从查询改写角度出发，先提示LLM生成查询，再用网络搜索引擎检索上下文。",
+      "returnedPages": [
+        1,
+        9,
+        1
+      ],
+      "pageHit": true,
+      "snippetMatch": true,
+      "answered": true,
+      "autoHit": true,
+      "manualFabricated": null,
+      "manualHit": null,
+      "elapsedMs": 1138,
+      "citations": [
+        {
+          "page": 1,
+          "snippet": "ge-intensive tasks. In fact, retrieval-\naugmented LLMs have been shown so effective\nthat they have b\n\neen regarded as a standard solu-\ntion to alleviate the factuality drawbacks in naive\nLLM generatio",
+          "chunkId": 351,
+          "bboxX0": 0.514286,
+          "bboxY0": 0.256758,
+          "bboxX1": 0.883989,
+          "bboxY1": 0.670685,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 9,
+          "snippet": "iting. Our work proposes a novel\nretrieval-augmented black-box LLM framework,\nproves that the retrie\n\nval augmentation can be en-\nhanced from the aspect of query rewriting, and\nprovides a new method f",
+          "chunkId": 411,
+          "bboxX0": 0.118387,
+          "bboxY0": 0.27241,
+          "bboxX1": 0.488763,
+          "bboxY1": 0.58726,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 1,
+          "snippet": "sjtu.edu.cn, zhaohai@cs.sjtu.edu.cn,\n{yegong, nanduan}@microsoft.com, Herbert.he@gmail.com\n\nAbstract\n\nLarge Language Models (LLMs) play pow-\nerful, black-box readers in the retrieve-then-\nread pipelin",
+          "chunkId": 347,
+          "bboxX0": 0.1471,
+          "bboxY0": 0.182367,
+          "bboxX1": 0.763595,
+          "bboxY1": 0.680064,
+          "bboxMode": "block",
+          "readingOrder": null
+        }
+      ]
+    },
+    {
+      "id": "O5",
+      "difficulty": "概览",
+      "paper": "B",
+      "question": "作者在结论中认为 Rewrite-Retrieve-Read 的主要贡献和效果是什么？",
+      "standardPages": [
+        9
+      ],
+      "status": 200,
+      "answer": "1) 论文主题为面向检索增强大语言模型的查询重写，提出Rewrite-Retrieve-Read框架，以解决输入文本与检索所需知识之间存在差距的问题；2) 主要贡献是首次提出将输入文本适配于冻结的检索器和LLM阅读器的检索增强框架，并引入使用小型可训练模型的可调方案，以较少资源消耗获得性能提升；3) 在开放域问答（HotpotQA、AmbigNQ、PopQA）和多选题问答（MMLU）等知识密集型下游任务上评估，使用T5-large作为重写器，ChatGPT和Vicuna-13B作为LLM阅读器；4) 结论认为查询重写持续提升检索增强LLM的性能，且较小语言模型能够胜任查询重写。",
+      "returnedPages": [
+        1,
+        1,
+        13
+      ],
+      "pageHit": false,
+      "snippetMatch": false,
+      "answered": true,
+      "autoHit": false,
+      "manualFabricated": null,
+      "manualHit": null,
+      "elapsedMs": 1572,
+      "citations": [
+        {
+          "page": 1,
+          "snippet": "Query Rewriting for Retrieval-Augmented Large Language Models\n\nXinbei Ma1,2,∗, Yeyun Gong3, #, †, Pengcheng He4, #, Hai Zhao1,2,†, Nan Duan3\n\n1Department of Computer Science and Engineering, Shanghai ",
+          "chunkId": 346,
+          "bboxX0": 0.153263,
+          "bboxY0": 0.088191,
+          "bboxX1": 0.846743,
+          "bboxY1": 0.268511,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 1,
+          "snippet": "sjtu.edu.cn, zhaohai@cs.sjtu.edu.cn,\n{yegong, nanduan}@microsoft.com, Herbert.he@gmail.com\n\nAbstract\n\nLarge Language Models (LLMs) play pow-\nerful, black-box readers in the retrieve-then-\nread pipelin",
+          "chunkId": 347,
+          "bboxX0": 0.1471,
+          "bboxY0": 0.182367,
+          "bboxX1": 0.763595,
+          "bboxY1": 0.680064,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 13,
+          "snippet": "knowledge base. The temporal misalignment prob-\nlem on a fixed candidate database can be alleviated.\n\nOn the other hand, web search APIs are commer-\ncial products requiring subscriptions. Also, the va",
+          "chunkId": 445,
+          "bboxX0": 0.119047,
+          "bboxY0": 0.088407,
+          "bboxX1": 0.488925,
+          "bboxY1": 0.212648,
+          "bboxMode": "block",
+          "readingOrder": null
+        }
+      ]
+    },
+    {
+      "id": "O4",
+      "difficulty": "概览",
+      "paper": "C",
+      "question": "RT-DETR 的实验使用了哪些数据集？训练集和验证集分别是什么？",
+      "standardPages": [
+        11
+      ],
+      "status": 200,
+      "answer": "RT-DETR 的实验使用 COCO 和 Objects365 数据集，在 COCO train2017 上训练，在 COCO val2017 上验证。",
+      "returnedPages": [
+        11,
+        4,
+        11
+      ],
+      "pageHit": true,
+      "snippetMatch": true,
+      "answered": true,
+      "autoHit": true,
+      "manualFabricated": null,
+      "manualHit": null,
+      "elapsedMs": 873,
+      "citations": [
+        {
+          "page": 11,
+          "snippet": "Appendix of “DETRs Beat YOLOs on Real-time Object Detection”\n\n1. Experimental Settings\n\nDataset and metric.\nWe conduct experiments on\nCOCO [20] and Objects365 [35], where RT-DETR is trained\non COCO tr",
+          "chunkId": 534,
+          "bboxX0": 0.081296,
+          "bboxY0": 0.09089,
+          "bboxX1": 0.822836,
+          "bboxY1": 0.549702,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 4,
+          "snippet": "ee\ndetectors (three times more in our tested detectors).\n\n4. The Real-time DETR\n\n4.1. Model Overview\n\nRT-DETR consists of a backbone, an efficient hybrid en-\ncoder, and a Transformer decoder with auxi",
+          "chunkId": 476,
+          "bboxX0": 0.081345,
+          "bboxY0": 0.278949,
+          "bboxX1": 0.470757,
+          "bboxY1": 0.640124,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 11,
+          "snippet": "2. Comparison with Lighter YOLO Detectors\n\nTo adapt to diverse real-time detection scenarios, we develop\nlighter scaled RT-DETRs by scaling the encoder and decoder\nwith ResNet50/34/18 [13]. Specifical",
+          "chunkId": 537,
+          "bboxX0": 0.081296,
+          "bboxY0": 0.574146,
+          "bboxX1": 0.470613,
+          "bboxY1": 0.900444,
+          "bboxMode": "block",
+          "readingOrder": null
+        }
+      ]
+    }
+  ],
+  "alphaResults": [
+    {
+      "id": "A1",
+      "difficulty": "方法",
+      "paper": "A",
+      "question": "分类器的三个复杂度标签 A、B、C 分别代表什么？",
+      "standardPages": [
+        5
+      ],
+      "status": 200,
+      "answer": "A：q 简单直接，LLM(q) 本身即可回答；B：q 具有中等复杂度，至少需要单步方法 LLM(q, d)；C：q 复杂，需要最广泛的解决方案 LLM(q, d, c)。",
+      "returnedPages": [
+        5,
+        8,
+        5
+      ],
+      "pageHit": true,
+      "snippetMatch": true,
+      "answered": true,
+      "autoHit": true,
+      "manualFabricated": null,
+      "manualHit": null,
+      "elapsedMs": 1056,
+      "citations": [
+        {
+          "page": 5,
+          "snippet": "ier design, there are three class labels: ‘A’,\n‘B’, and ‘C’, where ‘A’ indicates that q is straight-\n\nforward and answerable by LLM(q) itself, ‘B’ in-\ndicates that q has the moderate complexity where\n",
+          "chunkId": 253,
+          "bboxX0": 0.116005,
+          "bboxY0": 0.451183,
+          "bboxX1": 0.488765,
+          "bboxY1": 0.874172,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 8,
+          "snippet": "times. In addition to the true positive performance\nof our classifier averaged over all those three\n\n la-\nbels in Figure 3 (Left and Center), we further re-\nport its confusion matrix in Figure 3 (Righ",
+          "chunkId": 280,
+          "bboxX0": 0.116005,
+          "bboxY0": 0.205423,
+          "bboxX1": 0.488762,
+          "bboxY1": 0.619508,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 5,
+          "snippet": "ferent\ncomplexities, without changing the internal model\narchitecture or parameters during adaption.\n\nQuery Complexity Assessment\nTo operational-\nize our adaptive retrieval-augmented LLM frame-\nwork, ",
+          "chunkId": 252,
+          "bboxX0": 0.116005,
+          "bboxY0": 0.088407,
+          "bboxX1": 0.488766,
+          "bboxY1": 0.656049,
+          "bboxMode": "block",
+          "readingOrder": null
+        }
+      ]
+    },
+    {
+      "id": "A2",
+      "difficulty": "方法",
+      "paper": "A",
+      "question": "分类器的训练标签是如何自动构造的？",
+      "standardPages": [
+        5
+      ],
+      "status": 200,
+      "answer": "原文涉及该内容。分类器训练标签的自动构造方式为：首先进行标注；对于第一步标注后仍未标注的查询，将单跳数据集中的查询赋为‘B’，将多跳数据集中的查询赋为‘C’；最后用这些自动收集的查询-复杂度对训练分类器。",
+      "returnedPages": [
+        5,
+        8,
+        5
+      ],
+      "pageHit": true,
+      "snippetMatch": true,
+      "answered": true,
+      "autoHit": true,
+      "manualFabricated": null,
+      "manualHit": null,
+      "elapsedMs": 1091,
+      "citations": [
+        {
+          "page": 5,
+          "snippet": "ier design, there are three class labels: ‘A’,\n‘B’, and ‘C’, where ‘A’ indicates that q is straight-\n\nforward and answerable by LLM(q) itself, ‘B’ in-\ndicates that q has the moderate complexity where\n",
+          "chunkId": 253,
+          "bboxX0": 0.116005,
+          "bboxY0": 0.451183,
+          "bboxX1": 0.488765,
+          "bboxY1": 0.874172,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 8,
+          "snippet": "Labels\nTime/Query (Sec.)\nPercentage (%)\n\nNo (A)\n0.35\n8.60\nOne (B)\n3.08\n53.33\nMulti (C)\n27.18\n38.07\n\nClassifier Performance\nTo understand how the\nproposed classifier works, we analyze its perfor-\nmance",
+          "chunkId": 279,
+          "bboxX0": 0.116005,
+          "bboxY0": 0.118495,
+          "bboxX1": 0.488762,
+          "bboxY1": 0.50685,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 5,
+          "snippet": "tep approach). Therefore, for those queries\nthat remain unlabeled after the first labeling step,\nwe \n\nassign ‘B’ to queries in single-hop datasets\nand ‘C’ to queries in multi-hop datasets. Finally,\nwe",
+          "chunkId": 257,
+          "bboxX0": 0.510766,
+          "bboxY0": 0.28261,
+          "bboxX1": 0.884003,
+          "bboxY1": 0.754061,
+          "bboxMode": "block",
+          "readingOrder": null
+        }
+      ]
+    },
+    {
+      "id": "A3",
+      "difficulty": "结论",
+      "paper": "A",
+      "question": "与多步（multi-step）方法相比，论文如何描述 Adaptive-RAG 的效率？",
+      "standardPages": [
+        7
+      ],
+      "status": 200,
+      "answer": "与复杂的多步（multi-step）策略相比，论文指出所提出的自适应策略在所有模型规模上都显著更高效（significantly more efficient across all model sizes）。",
+      "returnedPages": [
+        7,
+        2,
+        8
+      ],
+      "pageHit": true,
+      "snippetMatch": true,
+      "answered": true,
+      "autoHit": true,
+      "manualFabricated": null,
+      "manualHit": null,
+      "elapsedMs": 966,
+      "citations": [
+        {
+          "page": 7,
+          "snippet": "also efficiency. As shown in Table 1, compared to\nthe complex multi-step strategy, our proposed ada\n\np-\ntive strategy is significantly more efficient across\nall model sizes. This is meaningful in this",
+          "chunkId": 276,
+          "bboxX0": 0.513626,
+          "bboxY0": 0.442231,
+          "bboxX1": 0.884002,
+          "bboxY1": 0.920535,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 2,
+          "snippet": "ificantly enhancing the over-\nall efficiency and accuracy, as shown in Figure 1.\nWe refer to our fra\n\nmework as Adaptive Retrieval-\nAugmented Generation (Adaptive-RAG).\n\nWe validate Adaptive-RAG using",
+          "chunkId": 230,
+          "bboxX0": 0.513424,
+          "bboxY0": 0.275742,
+          "bboxX1": 0.884157,
+          "bboxY1": 0.920774,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 8,
+          "snippet": "urce-efficient set-\ntings in real-use cases with smaller sizes without\ncompromising the performance.\n\nCase Study\nWe conduct a case study to qualita-\ntively compare our Adaptive-RAG against Adap-\ntive ",
+          "chunkId": 286,
+          "bboxX0": 0.513626,
+          "bboxY0": 0.621457,
+          "bboxX1": 0.883996,
+          "bboxY1": 0.920774,
+          "bboxMode": "block",
+          "readingOrder": null
+        }
+      ]
+    },
+    {
+      "id": "A4",
+      "difficulty": "细节",
+      "paper": "A",
+      "question": "表 3 中，标签 A、B、C 对应的每查询精确耗时分别是多少？",
+      "standardPages": [
+        8
+      ],
+      "status": 200,
+      "answer": "标签 A、B、C 对应的每查询精确耗时分别是 0.35 秒、3.08 秒、27.18 秒。",
+      "returnedPages": [
+        8,
+        8,
+        8
+      ],
+      "pageHit": true,
+      "snippetMatch": true,
+      "answered": true,
+      "autoHit": true,
+      "manualFabricated": null,
+      "manualHit": null,
+      "elapsedMs": 1155,
+      "citations": [
+        {
+          "page": 8,
+          "snippet": "Table 3: The exact elapsed time per query and the percentage\nof the predicted labels from the classifier over all samples.\n\nLabels\nTime/Query (Sec.)\nPercentage (%)\n\nNo (A)\n0.35\n8.60\nOne (B)\n3.08\n53.33",
+          "chunkId": 278,
+          "bboxX0": 0.11858,
+          "bboxY0": 0.085238,
+          "bboxX1": 0.485714,
+          "bboxY1": 0.180136,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 8,
+          "snippet": "further refining it based\non such misclassification would be a meaningful\ndirection for future work.\n\nAnalyses on Efficiency for Classifier\nWhile Ta-\nble 1 shows the relative elapsed time for each of ",
+          "chunkId": 281,
+          "bboxX0": 0.118443,
+          "bboxY0": 0.543548,
+          "bboxX1": 0.488765,
+          "bboxY1": 0.794281,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 8,
+          "snippet": "Labels\nTime/Query (Sec.)\nPercentage (%)\n\nNo (A)\n0.35\n8.60\nOne (B)\n3.08\n53.33\nMulti (C)\n27.18\n38.07\n\nClassifier Performance\nTo understand how the\nproposed classifier works, we analyze its perfor-\nmance",
+          "chunkId": 279,
+          "bboxX0": 0.116005,
+          "bboxY0": 0.118495,
+          "bboxX1": 0.488762,
+          "bboxY1": 0.50685,
+          "bboxMode": "block",
+          "readingOrder": null
+        }
+      ]
+    },
+    {
+      "id": "B1",
+      "difficulty": "方法",
+      "paper": "B",
+      "question": "Rewrite-Retrieve-Read 框架包含哪三个步骤？",
+      "standardPages": [
+        4
+      ],
+      "status": 200,
+      "answer": "原文包含该信息。Rewrite-Retrieve-Read 框架包含三个步骤：(i) Query rewrite：基于原始输入 x 生成所需知识的查询 ˜x；(ii) Retrieve：搜索相关上下文 doc；(iii) Read：理解输入与上下文 [doc, x] 并预测输出 ˆy。",
+      "returnedPages": [
+        4,
+        4,
+        9
+      ],
+      "pageHit": true,
+      "snippetMatch": true,
+      "answered": true,
+      "autoHit": true,
+      "manualFabricated": null,
+      "manualHit": null,
+      "elapsedMs": 1037,
+      "citations": [
+        {
+          "page": 4,
+          "snippet": "eline\nframework in section 3.1, then the trainable scheme\nin section 3.2.\n\n3.1\nRewrite-Retrieve-Read\n\nA task with retrieval augmentation can be de-\nnoted as follows. Given a dataset of a knowledge-\nin",
+          "chunkId": 372,
+          "bboxX0": 0.118387,
+          "bboxY0": 0.157314,
+          "bboxX1": 0.488763,
+          "bboxY1": 0.441431,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 4,
+          "snippet": "constructing the search query.\n\n3\nMethodology\n\nWe present Rewrite-Retrieve-Read, a pipeline that\n\nimproves the retrieval-augmented LLM from the\nperspective of query rewriting. Figure 1 shows an\novervi",
+          "chunkId": 371,
+          "bboxX0": 0.118186,
+          "bboxY0": 0.088407,
+          "bboxX1": 0.485722,
+          "bboxY1": 0.259644,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 9,
+          "snippet": "Introduction to Community\nPlanning where the answer environment appears\nseveral times.\n\n7\nConclusion\n\nThis paper introduces the Rewrite-Retrieve-Read\npipeline, where a query rewriting step is added\nfo",
+          "chunkId": 410,
+          "bboxX0": 0.118387,
+          "bboxY0": 0.088407,
+          "bboxX1": 0.48892,
+          "bboxY1": 0.557589,
+          "bboxMode": "block",
+          "readingOrder": null
+        }
+      ]
+    },
+    {
+      "id": "B2",
+      "difficulty": "细节",
+      "paper": "B",
+      "question": "可训练的 rewriter 用什么模型初始化，参数量是多少？",
+      "standardPages": [
+        4
+      ],
+      "status": 200,
+      "answer": "可训练的 rewriter 用预训练的 T5-large（770M）初始化。",
+      "returnedPages": [
+        4,
+        12,
+        2
+      ],
+      "pageHit": true,
+      "snippetMatch": true,
+      "answered": true,
+      "autoHit": true,
+      "manualFabricated": null,
+      "manualHit": null,
+      "elapsedMs": 756,
+      "citations": [
+        {
+          "page": 4,
+          "snippet": "it is\nfeasible to add a trainable model and adapt it by\ntaking the LLM reader feedback as a reward.\n\nBased on our framework, we further propose to\nutilize a trainable small language model to take\nover",
+          "chunkId": 374,
+          "bboxX0": 0.118443,
+          "bboxY0": 0.557536,
+          "bboxX1": 0.48875,
+          "bboxY1": 0.918624,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 12,
+          "snippet": "tuning lan-\nguage models from human preferences.\narXiv\npreprint arXiv:1909.08593.\n\nA\nWarm-up Dataset\n\nFor the warm-up training of the tuneable rewriter,\nwe construct a pseudo dataset for the query rew",
+          "chunkId": 439,
+          "bboxX0": 0.118186,
+          "bboxY0": 0.491152,
+          "bboxX1": 0.488921,
+          "bboxY1": 0.81781,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 2,
+          "snippet": "nce. The results also indicate that the\nsmaller language model can be competent for query\nrewriting.\n\nTo sum up, our proposed novel retrieval-\naugmentation method, rewrite-retrieve-read is the\nfirst f",
+          "chunkId": 359,
+          "bboxX0": 0.513626,
+          "bboxY0": 0.088407,
+          "bboxX1": 0.884001,
+          "bboxY1": 0.348948,
+          "bboxMode": "block",
+          "readingOrder": null
+        }
+      ]
+    },
+    {
+      "id": "B3",
+      "difficulty": "结论",
+      "paper": "B",
+      "question": "论文结论认为该工作的主要贡献是什么？",
+      "standardPages": [
+        9
+      ],
+      "status": 200,
+      "answer": "1) 论文主题为面向检索增强大语言模型的查询重写，提出Rewrite-Retrieve-Read框架，解决输入文本与检索所需知识之间存在差距的问题；2) 主要贡献是首次提出对冻结的检索器和LLM阅读器适配输入文本的框架，引入小型可训练模型的可调方案，以较少资源消耗获得性能提升，并通过可训练小模型对齐LM与搜索工具等无训练参数工具；3) 在开放域QA（HotpotQA、AmbigNQ、PopQA）和多选题QA（MMLU）上评估，使用T5-large作为重写器，ChatGPT和Vicuna-13B作为LLM阅读器；4) 结论为查询重写持续提升检索增强LLM性能，且较小语言模型能够胜任查询重写。",
+      "returnedPages": [
+        1,
+        1,
+        13
+      ],
+      "pageHit": false,
+      "snippetMatch": false,
+      "answered": true,
+      "autoHit": false,
+      "manualFabricated": null,
+      "manualHit": null,
+      "elapsedMs": 1841,
+      "citations": [
+        {
+          "page": 1,
+          "snippet": "Query Rewriting for Retrieval-Augmented Large Language Models\n\nXinbei Ma1,2,∗, Yeyun Gong3, #, †, Pengcheng He4, #, Hai Zhao1,2,†, Nan Duan3\n\n1Department of Computer Science and Engineering, Shanghai ",
+          "chunkId": 346,
+          "bboxX0": 0.153263,
+          "bboxY0": 0.088191,
+          "bboxX1": 0.846743,
+          "bboxY1": 0.268511,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 1,
+          "snippet": "sjtu.edu.cn, zhaohai@cs.sjtu.edu.cn,\n{yegong, nanduan}@microsoft.com, Herbert.he@gmail.com\n\nAbstract\n\nLarge Language Models (LLMs) play pow-\nerful, black-box readers in the retrieve-then-\nread pipelin",
+          "chunkId": 347,
+          "bboxX0": 0.1471,
+          "bboxY0": 0.182367,
+          "bboxX1": 0.763595,
+          "bboxY1": 0.680064,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 13,
+          "snippet": "knowledge base. The temporal misalignment prob-\nlem on a fixed candidate database can be alleviated.\n\nOn the other hand, web search APIs are commer-\ncial products requiring subscriptions. Also, the va",
+          "chunkId": 445,
+          "bboxX0": 0.119047,
+          "bboxY0": 0.088407,
+          "bboxX1": 0.488925,
+          "bboxY1": 0.212648,
+          "bboxMode": "block",
+          "readingOrder": null
+        }
+      ]
+    },
+    {
+      "id": "C1",
+      "difficulty": "方法",
+      "paper": "C",
+      "question": "RT-DETR 的高效混合编码器由哪两个模块组成？",
+      "standardPages": [
+        4,
+        5
+      ],
+      "status": 200,
+      "answer": "RT-DETR 的高效混合编码器由 Attention-based Intra-scale Feature Interaction (AIFI) 和 CNN-based Cross-scale Feature Fusion (CCFF) 两个模块组成。",
+      "returnedPages": [
+        1,
+        4,
+        5
+      ],
+      "pageHit": true,
+      "snippetMatch": true,
+      "answered": true,
+      "autoHit": true,
+      "manualFabricated": null,
+      "manualHit": null,
+      "elapsedMs": 917,
+      "citations": [
+        {
+          "page": 1,
+          "snippet": "detector to our best knowledge\nthat addresses the above dilemma. We build RT-DETR in\ntwo steps, draw\n\ning on the advanced DETR: first we focus\non maintaining accuracy while improving speed, followed\nb",
+          "chunkId": 449,
+          "bboxX0": 0.080889,
+          "bboxY0": 0.300596,
+          "bboxX1": 0.470621,
+          "bboxY1": 0.673717,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 4,
+          "snippet": "ee\ndetectors (three times more in our tested detectors).\n\n4. The Real-time DETR\n\n4.1. Model Overview\n\nRT-DETR consists of a backbone, an efficient hybrid en-\ncoder, and a Transformer decoder with auxi",
+          "chunkId": 476,
+          "bboxX0": 0.081345,
+          "bboxY0": 0.278949,
+          "bboxX1": 0.470757,
+          "bboxY1": 0.640124,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 5,
+          "snippet": "Decoder & Head\n\nAIFI\n\nC\n\nFusion\n\nS5\n\nPosition Embedding\n\nFusion\n\nS4\n\nImage Feature\n\nS3\n\nObject Query\n\nFigure 4. Overview of RT-DETR. We feed the features from the last three stages of the backbone int",
+          "chunkId": 485,
+          "bboxX0": 0.081882,
+          "bboxY0": 0.153624,
+          "bboxX1": 0.89169,
+          "bboxY1": 0.504992,
+          "bboxMode": "block",
+          "readingOrder": null
+        }
+      ]
+    },
+    {
+      "id": "C2",
+      "difficulty": "细节",
+      "paper": "C",
+      "question": "RT-DETR-R50 在 COCO 上达到多少 AP、多少 FPS（T4 GPU）？",
+      "standardPages": [
+        1,
+        2
+      ],
+      "status": 200,
+      "answer": "RT-DETR-R50 在 COCO val2017 上达到 53.1% AP，在 T4 GPU 上达到 108 FPS。",
+      "returnedPages": [
+        2,
+        1,
+        6
+      ],
+      "pageHit": true,
+      "snippetMatch": true,
+      "answered": true,
+      "autoHit": true,
+      "manualFabricated": null,
+      "manualHit": null,
+      "elapsedMs": 780,
+      "citations": [
+        {
+          "page": 2,
+          "snippet": "ious real-time scenarios without retraining, thanks\nto the multi-layer decoder architecture of DETR.\n\nRT-DETR achieves an ideal trade-off between the speed\nand accuracy. Specifically, RT-DETR-R50 achi",
+          "chunkId": 459,
+          "bboxX0": 0.081296,
+          "bboxY0": 0.431549,
+          "bboxX1": 0.470621,
+          "bboxY1": 0.900444,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 1,
+          "snippet": "retraining. Our RT-DETR-R50\n/ R101 achieves 53.1% / 54.3% AP on COCO and 108 / 74\nFPS on T4 GPU, out\n\nperforming previously advanced YOLOs\n\nin both speed and accuracy. Furthermore, RT-DETR-R50\noutperf",
+          "chunkId": 450,
+          "bboxX0": 0.080889,
+          "bboxY0": 0.300596,
+          "bboxX1": 0.470622,
+          "bboxY1": 0.879096,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 6,
+          "snippet": "ted on T4 GPU with TensorRT FP16, and for\nYOLO detectors using official pre-trained models according\n\nto the end-to-end speed benchmark proposed in Sec. 3.2. Our\nRT-DETR-R50 achieves 53.1% AP and 108 ",
+          "chunkId": 496,
+          "bboxX0": 0.503732,
+          "bboxY0": 0.373673,
+          "bboxX1": 0.893415,
+          "bboxY1": 0.642682,
+          "bboxMode": "block",
+          "readingOrder": null
+        }
+      ]
+    },
+    {
+      "id": "C3",
+      "difficulty": "结论",
+      "paper": "C",
+      "question": "论文结论把 RT-DETR 的两项关键改进归纳为什么？",
+      "standardPages": [
+        8
+      ],
+      "status": 200,
+      "answer": "论文结论将 RT-DETR 的两项关键改进归纳为：高效混合编码器（efficient hybrid encoder），用于快速处理多尺度特征；以及不确定性最小化查询选择（uncertainty-minimal query selection），用于提高初始对象查询的质量。",
+      "returnedPages": [
+        1,
+        1,
+        13
+      ],
+      "pageHit": false,
+      "snippetMatch": false,
+      "answered": true,
+      "autoHit": false,
+      "manualFabricated": null,
+      "manualHit": null,
+      "elapsedMs": 1129,
+      "citations": [
+        {
+          "page": 1,
+          "snippet": "DETRs Beat YOLOs on Real-time Object Detection\n\nYian Zhao1,2†\nWenyu Lv1†‡\nShangliang Xu1\nJinman Wei1\nGuanzhong Wang1\n\nQingqing Dang1\nYi Liu1\nJie Chen2\n\n1Baidu Inc, Beijing, China\n2School of Electronic",
+          "chunkId": 447,
+          "bboxX0": 0.017876,
+          "bboxY0": 0.135144,
+          "bboxX1": 0.826951,
+          "bboxY1": 0.700758,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 1,
+          "snippet": "edu.cn\nlvwenyu01@baidu.com\njiechen2019@pku.edu.cn\n\nAbstract\n\narXiv:2304.08069v3  [cs.CV]  3 Apr 2024\n\nThe YOLO series has become the most popular frame-\nwork for real-time object detection due to its ",
+          "chunkId": 448,
+          "bboxX0": 0.017876,
+          "bboxY0": 0.244374,
+          "bboxX1": 0.723034,
+          "bboxY1": 0.700758,
+          "bboxMode": "block",
+          "readingOrder": null
+        },
+        {
+          "page": 13,
+          "snippet": "t-\nability of real-time detectors across various scenarios.\n\n5. Visualization of RT-DETR Predictions\n\nWe select several samples from the COCO val2017 to\nshowcase the detection performance of RT-DETR i",
+          "chunkId": 550,
+          "bboxX0": 0.503912,
+          "bboxY0": 0.765027,
+          "bboxX1": 0.893408,
+          "bboxY1": 0.900444,
+          "bboxMode": "block",
+          "readingOrder": null
+        }
+      ]
+    }
+  ],
+  "negativeResults": [
+    {
+      "id": "N1",
+      "paper": "A",
+      "question": "这篇论文用了多少只小白鼠？",
+      "status": 200,
+      "answer": "本文未涉及该内容",
+      "citationCount": 0,
+      "passed": true
+    },
+    {
+      "id": "N2",
+      "paper": "B",
+      "question": "这篇论文用了多少只小白鼠？",
+      "status": 200,
+      "answer": "本文未涉及该内容",
+      "citationCount": 0,
+      "passed": true
+    },
+    {
+      "id": "N3",
+      "paper": "C",
+      "question": "这篇论文用了多少只小白鼠？",
+      "status": 200,
+      "answer": "本文未涉及该内容",
+      "citationCount": 0,
+      "passed": true
+    }
+  ],
+  "note": "hitsAuto 只校验答案非拒答、引用页码与片段；最终命中仍须人工确认不编造并填写 manualHit。"
+}

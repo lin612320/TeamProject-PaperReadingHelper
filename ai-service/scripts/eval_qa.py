@@ -33,7 +33,8 @@ sys.path.insert(0, BASE_DIR)
 from app.db.connection import get_connection
 
 BASE_URL = os.getenv("AI_SERVICE_URL", "http://127.0.0.1:8000").rstrip("/")
-DEFAULT_BANK = os.path.join(REPO_ROOT, "docs", "测试", "F3抽样题库.md")
+DEFAULT_BANK = os.path.join(REPO_ROOT, "docs", "alpha", "测试", "F3抽样题库.md")
+DEFAULT_OVERVIEW_BANK = os.path.join(REPO_ROOT, "docs", "测试", "Beta85概览题库.md")
 DEFAULT_OUT = os.path.join(REPO_ROOT, "docs", "测试")
 NO_ANSWER = "本文未涉及该内容"
 
@@ -128,6 +129,44 @@ def parse_bank(path):
         if item["paper"] not in papers:
             raise ValueError("题目引用了未声明的论文: " + item["paper"])
     return papers, questions, negatives
+
+
+def parse_overview_bank(path, papers):
+    """解析 #85 的五道概览题；Alpha 题库保持不变。"""
+    with open(path, encoding="utf-8") as f:
+        lines = f.readlines()
+
+    questions = []
+    section = ""
+    for line in lines:
+        if line.startswith("## "):
+            section = line.strip()
+            continue
+        if not section.startswith("## 概览题") or not line.startswith("|") or line.startswith("|---"):
+            continue
+        cells = split_row(line)
+        if not cells or not re.fullmatch(r"O\d+", cells[0]):
+            continue
+        if len(cells) < 6:
+            raise ValueError("概览题字段不足: " + line)
+        pages = [int(p) for p in re.findall(r"p(\d+)", cells[4], re.IGNORECASE)]
+        if not pages:
+            raise ValueError("概览题缺少标准页: " + line)
+        questions.append({
+            "id": cells[0],
+            "difficulty": cells[1],
+            "paper": cells[2],
+            "question": cells[3],
+            "standardPages": pages,
+            "evidence": cells[5],
+        })
+
+    if len(questions) != 5:
+        raise ValueError("#85 概览题应为 5 道，实际 %d 道" % len(questions))
+    for item in questions:
+        if item["paper"] not in papers:
+            raise ValueError("概览题引用了未声明的论文: " + item["paper"])
+    return questions
 
 
 def file_hash(path):
@@ -328,16 +367,142 @@ def write_outputs(results, negatives, meta, out_dir):
     return json_path, md_path
 
 
+def write_beta85_outputs(overview_results, alpha_results, negatives, meta, out_dir):
+    """写出 #85 三组当前结果，并保留人工复核状态，避免把自动命中冒充最终命中。"""
+    os.makedirs(out_dir, exist_ok=True)
+    date = datetime.date.today().isoformat()
+    suffix = ("-" + meta["label"]) if meta.get("label") else ""
+    groups = {
+        "overview": {
+            "hitsAuto": sum(1 for r in overview_results if r["autoHit"]),
+            "total": len(overview_results),
+            "required": 4,
+            "autoThresholdMet": sum(1 for r in overview_results if r["autoHit"]) >= 4,
+            "manualReviewPending": any(r["manualHit"] is None for r in overview_results),
+        },
+        "alpha": {
+            "hitsAuto": sum(1 for r in alpha_results if r["autoHit"]),
+            "total": len(alpha_results),
+            "required": 9,
+            "autoThresholdMet": sum(1 for r in alpha_results if r["autoHit"]) >= 9,
+            "manualReviewPending": any(r["manualHit"] is None for r in alpha_results),
+        },
+        "negative": {
+            "passed": sum(1 for r in negatives if r["passed"]),
+            "total": len(negatives),
+            "required": len(negatives),
+        },
+    }
+    payload = {
+        **meta,
+        "date": date,
+        "baseline": {
+            "overview": "改动前无 O1-O5 同题前测；Alpha 原 B3 曾出现概括题拒答，不折算为 0/5。",
+            "alpha": {"hits": 9, "total": 10,
+                      "source": "docs/alpha/测试/F3抽样结果-2026-11-05-3papers.md"},
+            "negative": {"passed": 3, "total": 3,
+                         "source": "docs/alpha/测试/F3抽样结果-2026-11-05-3papers.md"},
+        },
+        "groups": groups,
+        "overviewResults": overview_results,
+        "alphaResults": alpha_results,
+        "negativeResults": negatives,
+        "note": "hitsAuto 只校验答案非拒答、引用页码与片段；最终命中仍须人工确认不编造并填写 manualHit。",
+    }
+    json_path = os.path.join(out_dir, "Beta85回归-%s%s.json" % (date, suffix))
+    md_path = os.path.join(out_dir, "Beta85回归-%s%s.md" % (date, suffix))
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+
+    lines = [
+        "# #85 召回回归三组结果（%s%s）" %
+        (date, (" / " + meta["label"]) if meta.get("label") else ""),
+        "",
+        "## 改动前基线",
+        "",
+        "- 概览组：无 O1–O5 同题前测；Alpha 原 B3 曾出现概括题拒答，不能当作本组 0/5。",
+        "- Alpha 原 10 题：**9/10**；未涉及题：**3/3**。来源：`docs/alpha/测试/F3抽样结果-2026-11-05-3papers.md`。",
+        "",
+        "## 改动后结果",
+        "",
+        "| 组别 | 自动校验 | 验收线 | 状态 |",
+        "|---|---:|---:|---|",
+        "| 概览 O1–O5 | %(overview_auto)d/5 | ≥4/5 | %(overview_state)s |" % {
+            "overview_auto": groups["overview"]["hitsAuto"],
+            "overview_state": (
+                "自动校验未达线" if not groups["overview"]["autoThresholdMet"]
+                else "待人工复核答案是否编造" if groups["overview"]["manualReviewPending"]
+                else "人工已复核"
+            ),
+        },
+        "| Alpha 原题 | %(alpha_auto)d/10 | ≥9/10 | %(alpha_state)s |" % {
+            "alpha_auto": groups["alpha"]["hitsAuto"],
+            "alpha_state": (
+                "自动校验未达线" if not groups["alpha"]["autoThresholdMet"]
+                else "待人工复核答案是否编造" if groups["alpha"]["manualReviewPending"]
+                else "人工已复核"
+            ),
+        },
+        "| 未涉及题 | %(negative_passed)d/%(negative_total)d | 全部拒答 | %(negative_state)s |" % {
+            "negative_passed": groups["negative"]["passed"],
+            "negative_total": groups["negative"]["total"],
+            "negative_state": "通过" if groups["negative"]["passed"] == groups["negative"]["total"] else "未通过",
+        },
+        "",
+        "> 自动命中不等同于最终命中。请按 `docs/alpha/测试/命中率判定口径.md` 人工核对答案是否编造，并在 JSON 中填写每题 `manualHit` 后确认前两组最终命中数。",
+        "",
+        "## 概览题逐题记录",
+        "",
+        "| 题号 | 答案 | 引用页码 | 页码/片段自动校验 | 人工最终命中 |",
+        "|---|---|---|---|---|",
+    ]
+    for r in overview_results:
+        answer = re.sub(r"\s+", " ", str(r["answer"])).replace("|", "/")
+        lines.append("| %s | %s | %s | %s | 待复核 |" % (
+            r["id"], answer, r["returnedPages"],
+            "通过" if r["autoHit"] else "不通过",
+        ))
+    lines += ["", "## Alpha 原 10 题逐题记录", "",
+              "| 题号 | 答案 | 引用页码 | 页码/片段自动校验 | 人工最终命中 |",
+              "|---|---|---|---|---|"]
+    for r in alpha_results:
+        answer = re.sub(r"\s+", " ", str(r["answer"])).replace("|", "/")
+        lines.append("| %s | %s | %s | %s | 待复核 |" % (
+            r["id"], answer, r["returnedPages"],
+            "通过" if r["autoHit"] else "不通过",
+        ))
+    lines += ["", "## 未涉及题逐题记录", "",
+              "| 题号 | 答案 | citations 数 | 拒答校验 |", "|---|---|---:|---|"]
+    for r in negatives:
+        answer = str(r["answer"]).replace("|", "/").replace("\n", " ")
+        lines.append("| %s | %s | %d | %s |" % (
+            r["id"], answer, r["citationCount"],
+            "通过" if r["passed"] else "不通过",
+        ))
+    lines += ["", "- 服务地址：`%s`" % meta["baseUrl"],
+              "- git commit：`%s`" % (meta.get("gitCommit") or "unknown"),
+              "- 逐题答案和引用详情见同名 JSON 文件。"]
+    with open(md_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    return json_path, md_path
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--bank", default=DEFAULT_BANK)
     parser.add_argument("--out", default=DEFAULT_OUT)
     parser.add_argument("--label", default="", help="结果文件后缀，如 round1/round2")
+    parser.add_argument("--beta85", action="store_true",
+                        help="运行 #85 三组回归：5 道概览题 + Alpha 原 10 题 + 3 道未涉及题")
+    parser.add_argument("--overview-bank", default=DEFAULT_OVERVIEW_BANK,
+                        help="#85 概览题题库路径")
     args = parser.parse_args()
 
     papers, questions, negatives = parse_bank(args.bank)
-    print("题库: %d 篇论文 / %d 题 / %d 个未涉及题"
-          % (len(papers), len(questions), len(negatives)))
+    overview_questions = parse_overview_bank(args.overview_bank, papers) if args.beta85 else []
+    print("题库: %d 篇论文 / %d 题 / %d 个未涉及题%s"
+          % (len(papers), len(questions), len(negatives),
+             " / %d 道概览题" % len(overview_questions) if args.beta85 else ""))
 
     # 校验每篇 PDF 存在且哈希一致
     for code, paper in papers.items():
@@ -363,7 +528,7 @@ def main():
 
     paper_ids = {}
     meta_papers = {}
-    all_results, all_negatives = [], []
+    all_results, all_negatives, all_overview_results = [], [], []
     try:
         for code, paper in papers.items():
             paper_id = add_paper("__f3_%s__" % code.lower(), paper["absPath"])
@@ -392,6 +557,10 @@ def main():
             all_results.extend(
                 evaluate_questions(paper_id, paper_questions, paper["pageTexts"])
             )
+            paper_overview = [q for q in overview_questions if q["paper"] == code]
+            all_overview_results.extend(
+                evaluate_questions(paper_id, paper_overview, paper["pageTexts"])
+            )
             all_negatives.extend(evaluate_negatives(paper_id, paper_negatives))
     finally:
         for code, paper_id in paper_ids.items():
@@ -404,6 +573,24 @@ def main():
         "label": args.label,
         "papers": meta_papers,
     }
+    if args.beta85:
+        json_path, md_path = write_beta85_outputs(
+            all_overview_results, all_results, all_negatives, meta, args.out
+        )
+        overview_auto = sum(1 for r in all_overview_results if r["autoHit"])
+        alpha_auto = sum(1 for r in all_results if r["autoHit"])
+        negative_passed = sum(1 for r in all_negatives if r["passed"])
+        print("#85 自动校验：概览 %d/%d（要求 ≥4/5），Alpha %d/%d（要求 ≥9/10），未涉及 %d/%d（要求全通过）"
+              % (overview_auto, len(all_overview_results), alpha_auto,
+                 len(all_results), negative_passed, len(all_negatives)))
+        print("结果已写入：", json_path, md_path)
+        if (overview_auto < 4 or alpha_auto < 9
+                or negative_passed != len(all_negatives)):
+            print("自动校验未达线；检查逐题记录。")
+            sys.exit(1)
+        print("自动校验达到门槛；仍需人工核对答案是否编造后确认最终命中。")
+        sys.exit(2)
+
     json_path, md_path = write_outputs(all_results, all_negatives, meta, args.out)
 
     auto_hits = sum(1 for r in all_results if r["autoHit"])
