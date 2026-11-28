@@ -43,7 +43,7 @@ public class ExplainController {
     @Value("${app.ai-service.url:http://localhost:8000}")
     private String aiServiceUrl;
 
-    @Value("${app.explain.timeout-seconds:25}")
+    @Value("${app.explain.timeout-seconds:12}")
     private long explainTimeoutSeconds;
 
     @PostMapping
