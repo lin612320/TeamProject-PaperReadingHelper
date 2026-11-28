@@ -34,6 +34,12 @@ public class OpenAlexClient {
         public List<Map<String, Object>> items = new ArrayList<>();
     }
 
+    public static class RateLimitedException extends RuntimeException {
+        public RateLimitedException(String message) {
+            super(message);
+        }
+    }
+
     public Result search(String keyword, int page, int size) throws Exception {
         String url = openAlexUrl
             + "?search=" + URLEncoder.encode(keyword, StandardCharsets.UTF_8)
@@ -50,11 +56,22 @@ public class OpenAlexClient {
 
     private byte[] fetchWithRetry(String url) throws Exception {
         int attempts = 2;
-        long perAttempt = Math.max(3, timeoutSeconds / attempts);
+        long perAttempt = Math.min(5L, Math.max(3, timeoutSeconds / attempts));
         Exception last = null;
         for (int i = 1; i <= attempts; i++) {
             try {
                 return fetchOnce(url, perAttempt);
+            } catch (RateLimitedException e) {
+                last = e;
+                log.warn("openalex 限流 第{}/{}次：{}", i, attempts, e.getMessage());
+                if (i < attempts) {
+                    try {
+                        Thread.sleep(1000L);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw e;
+                    }
+                }
             } catch (java.net.http.HttpTimeoutException e) {
                 last = e; log.warn("openalex 请求超时 第{}次", i);
             } catch (java.io.IOException e) {
@@ -77,8 +94,12 @@ public class OpenAlexClient {
             .GET().build();
         HttpResponse<byte[]> response =
             client.send(request, HttpResponse.BodyHandlers.ofByteArray());
-        if (response.statusCode() != 200) {
-            throw new IllegalStateException("OpenAlex 返回 HTTP " + response.statusCode());
+        int status = response.statusCode();
+        if (status == 429 || status == 403) {
+            throw new RateLimitedException("OpenAlex 限流 HTTP " + status);
+        }
+        if (status != 200) {
+            throw new IllegalStateException("OpenAlex 返回 HTTP " + status);
         }
         return response.body();
     }

@@ -40,6 +40,13 @@ public class ArxivClient {
         public List<Map<String, Object>> items = new ArrayList<>();
     }
 
+    /** arXiv 限流/拒绝：不重试，直接交给上层兜底（BUG-030） */
+    public static class RateLimitedException extends RuntimeException {
+        public RateLimitedException(String message) {
+            super(message);
+        }
+    }
+
     /**
      * @param keyword    关键词（已 trim，调用方保证非空）
      * @param start      偏移量 = (page-1)*size
@@ -62,7 +69,7 @@ public class ArxivClient {
 
     private byte[] fetchWithRetry(String url) throws Exception {
         int attempts = 2;
-        long perAttempt = Math.max(3, timeoutSeconds / attempts);   // 10 / 2 = 5 秒
+        long perAttempt = Math.min(8L, Math.max(3, timeoutSeconds / attempts));
         Exception last = null;
 
         for (int i = 1; i <= attempts; i++) {
@@ -74,6 +81,8 @@ public class ArxivClient {
             } catch (java.io.IOException e) {
                 last = e;
                 log.warn("arxiv 连接失败 第{}次：{}", i, e.toString());
+            } catch (RateLimitedException e) {
+                throw e;
             }
         }
         throw last;   // 两次都失败 → 交给上层降级
@@ -96,6 +105,9 @@ public class ArxivClient {
         HttpResponse<byte[]> response =
             client.send(request, HttpResponse.BodyHandlers.ofByteArray());
 
+        if (response.statusCode() == 429 || response.statusCode() == 403) {
+            throw new RateLimitedException("arXiv 限流 HTTP " + response.statusCode());
+        }
         if (response.statusCode() != 200) {
             throw new IllegalStateException("arXiv 返回 HTTP " + response.statusCode());
         }
